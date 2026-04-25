@@ -1,0 +1,107 @@
+/* Service Item - Clean Navigation Row */
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-5);
+  background: transparent;
+  border: none;
+  color: var(--color-fg-secondary);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.service-item:hover {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-fg-primary);
+}
+
+.service-item.active {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-fg-primary);
+}
+
+/* Service Name */
+.service-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Status Dot */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* CLI Indicator */
+.cli-indicator {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-fg-tertiary);
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.service-item:hover .cli-indicator,
+.service-item.active .cli-indicator {
+  color: var(--color-fg-secondary);
+}
+
+.status-dot.healthy {
+  background-color: var(--color-success);
+}
+
+.status-dot.unhealthy {
+  background-color: var(--color-error);
+}
+
+.status-dot.checking {
+  background-color: var(--color-warning);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-dot.unknown {
+  background-color: var(--color-fg-disabled);
+}
+
+.status-dot.cli {
+  background-color: var(--color-fg-quaternary);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Collapsed State */
+.service-item.collapsed {
+  padding: var(--space-2) var(--space-3);
+  justify-content: center;
+}
+
+.service-item.collapsed .status-dot {
+  width: 10px;
+  height: 10px;
+}
+
+.service-item.collapsed .cli-indicator {
+  width: 18px;
+  height: 18px;
+  font-size: var(--font-size-sm);
+}

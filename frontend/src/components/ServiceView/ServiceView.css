@@ -1,0 +1,147 @@
+/* ServiceView - Service Detail Page */
+
+.service-view {
+  padding: var(--space-8);
+  max-width: 1400px;
+}
+
+/* Not Found State */
+.not-found {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-8);
+  text-align: center;
+}
+
+.not-found h2 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-fg-primary);
+}
+
+.not-found p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-tertiary);
+}
+
+/* Service Header */
+.service-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+}
+
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.service-header h2 {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-fg-primary);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.type-badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.type-badge.rest {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-fg-secondary);
+}
+
+.type-badge.cli {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-fg-secondary);
+}
+
+/* Delete Button */
+.delete-service-btn {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-tertiary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.delete-service-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.tab {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  color: var(--color-fg-tertiary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--color-fg-secondary);
+  background-color: var(--color-bg-secondary);
+}
+
+.tab.active {
+  color: var(--color-fg-primary);
+  background-color: var(--color-bg-tertiary);
+}
+
+/* Tab Content */
+.tab-content {
+  min-height: 400px;
+}
+
+.health-content {
+  max-width: 480px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .service-view {
+    padding: var(--space-6);
+  }
+
+  .service-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

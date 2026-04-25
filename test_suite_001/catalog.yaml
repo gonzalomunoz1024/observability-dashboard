@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Catalog
+metadata:
+  name: test_suite_001
+  appId: a
+spec:
+  image: b
+  selection: 1
+  playbook:
+    url: lad
+    branch: da
+    fileName: das

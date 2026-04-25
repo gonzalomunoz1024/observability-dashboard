@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Service Alert</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; border-radius: 4px 4px 0 0; }
+        .header h1 { margin: 0 0 10px 0; font-size: 24px; }
+        .header h2 { margin: 0; font-size: 18px; font-weight: normal; }
+        .content { padding: 20px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-top: none; }
+        .detail-row { margin: 12px 0; padding: 8px 0; border-bottom: 1px solid #dee2e6; }
+        .detail-row:last-child { border-bottom: none; }
+        .label { font-weight: bold; color: #666; display: inline-block; width: 150px; }
+        .value { color: #333; }
+        .error-box { background-color: #fff3cd; border: 1px solid #ffc107; padding: 15px; margin: 15px 0; border-radius: 4px; }
+        .error-box .label { color: #856404; }
+        .footer { padding: 15px 20px; text-align: center; color: #666; font-size: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 4px 4px; }
+        .alert-badge { display: inline-block; background-color: #dc3545; color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Service Alert</h1>
+            <h2 th:text="${serviceName}">Service Name</h2>
+            <span class="alert-badge">SERVICE DOWN</span>
+        </div>
+        <div class="content">
+            <p>The following service has failed health checks and requires attention:</p>
+
+            <div class="detail-row">
+                <span class="label">Service URL:</span>
+                <span class="value" th:text="${serviceUrl}">https://example.com</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Consecutive Failures:</span>
+                <span class="value" th:text="${consecutiveFailures}">3</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="label">Alert Time:</span>
+                <span class="value" th:text="${timestamp}">2024-01-15 10:30:00 UTC</span>
+            </div>
+
+            <div class="error-box" th:if="${errorMessage}">
+                <span class="label">Error Details:</span>
+                <p th:text="${errorMessage}" style="margin: 5px 0 0 0;">Connection timeout</p>
+            </div>
+
+            <p style="margin-top: 20px;"><strong>Please investigate this issue as soon as possible.</strong></p>
+        </div>
+        <div class="footer">
+            <p>This is an automated alert from the Dashboard Health Monitor.</p>
+            <p>Do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>

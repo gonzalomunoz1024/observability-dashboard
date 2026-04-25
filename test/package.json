@@ -1,0 +1,32 @@
+{
+  "name": "mycli",
+  "version": "1.0.0",
+  "description": "CLI tool for generating test suite configurations",
+  "main": "index.js",
+  "bin": {
+    "mycli": "./bin/mycli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "pkg . --out-path dist",
+    "build:win": "pkg . --targets node18-win-x64 --out-path dist",
+    "build:mac": "pkg . --targets node18-macos-x64 --out-path dist",
+    "build:linux": "pkg . --targets node18-linux-x64 --out-path dist",
+    "build:all": "pkg . --targets node18-win-x64,node18-macos-x64,node18-linux-x64 --out-path dist"
+  },
+  "pkg": {
+    "scripts": ["commands/*.js"],
+    "assets": [],
+    "targets": ["node18-win-x64", "node18-macos-x64", "node18-linux-x64"]
+  },
+  "keywords": ["cli", "test-suite", "yaml"],
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "inquirer": "^8.2.6",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

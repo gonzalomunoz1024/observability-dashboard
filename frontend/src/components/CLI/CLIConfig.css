@@ -1,0 +1,290 @@
+.cli-config {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.cli-config h3 {
+  margin: 0 0 var(--space-5);
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-lg);
+}
+
+.config-section {
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.form-group {
+  margin-bottom: var(--space-4);
+}
+
+.form-group:last-child {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.form-group input {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-sm);
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.form-group input::placeholder {
+  color: var(--color-fg-quaternary);
+}
+
+.form-group.small {
+  max-width: 120px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.tests-section {
+  margin-bottom: var(--space-5);
+}
+
+.tests-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.tests-header h4 {
+  margin: 0;
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-sm);
+}
+
+.add-test-btn {
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 122, 255, 0.15);
+  color: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.add-test-btn:hover {
+  background: rgba(0, 122, 255, 0.25);
+}
+
+.test-case {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.test-case-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+.test-case-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.save-test-btn {
+  padding: var(--space-1) var(--space-2);
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--color-accent);
+  border: 1px solid rgba(0, 122, 255, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.save-test-btn:hover {
+  background: rgba(0, 122, 255, 0.2);
+}
+
+.test-number {
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.remove-btn {
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.remove-btn:hover {
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.test-case-fields .form-group {
+  margin-bottom: var(--space-3);
+}
+
+.expectations {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border-subtle);
+}
+
+.expectations-label {
+  display: block;
+  font-size: 10px;
+  color: var(--color-fg-quaternary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--space-2);
+}
+
+.expectations-row {
+  grid-template-columns: auto 1fr auto;
+}
+
+.config-error {
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-error);
+}
+
+.run-suite-btn {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-success);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.run-suite-btn:hover:not(:disabled) {
+  background: #2db854;
+}
+
+.run-suite-btn:disabled {
+  background: var(--color-fg-quaternary);
+  cursor: not-allowed;
+}
+
+/* Run Section */
+.run-section {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.run-section h4 {
+  margin: 0 0 var(--space-4);
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-sm);
+}
+
+.executable-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.upload-executable-btn {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-tertiary);
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.upload-executable-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.selected-executable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(52, 199, 89, 0.1);
+  border: 1px solid rgba(52, 199, 89, 0.3);
+  border-radius: var(--radius-md);
+  flex: 1;
+}
+
+.selected-executable .file-name {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--color-success);
+  font-family: var(--font-family-mono);
+}
+
+.selected-executable .clear-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.selected-executable .clear-btn:hover {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--color-error);
+}
+
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-quaternary);
+  margin-top: var(--space-2);
+}

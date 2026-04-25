@@ -1,0 +1,180 @@
+.run-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.run-modal {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  width: 100%;
+  max-width: 420px;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.run-modal h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-lg);
+}
+
+.run-modal-subtitle {
+  margin: 0 0 var(--space-5);
+  color: var(--color-fg-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.run-modal-subtitle strong {
+  color: var(--color-fg-primary);
+}
+
+.run-modal .form-group {
+  margin-bottom: var(--space-4);
+}
+
+.run-modal .form-group label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.run-modal .form-group input[type="text"] {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-sm);
+}
+
+.run-modal .executable-selector {
+  display: flex;
+  align-items: center;
+}
+
+.run-modal .upload-executable-btn {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-tertiary);
+  border: 1px dashed var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.run-modal .upload-executable-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.run-modal .selected-executable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(52, 199, 89, 0.1);
+  border: 1px solid rgba(52, 199, 89, 0.3);
+  border-radius: var(--radius-md);
+  flex: 1;
+}
+
+.run-modal .selected-executable .file-name {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--color-success);
+  font-family: var(--font-family-mono);
+}
+
+.run-modal .selected-executable .clear-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-fg-tertiary);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.run-modal .selected-executable .clear-btn:hover {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--color-error);
+}
+
+.run-modal-error {
+  padding: var(--space-3);
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+}
+
+.run-modal-actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.run-modal .cancel-btn {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-tertiary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.run-modal .cancel-btn:hover:not(:disabled) {
+  background: var(--color-bg-tertiary);
+  color: var(--color-fg-primary);
+}
+
+.run-modal .run-btn {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-success);
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.run-modal .run-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.run-modal .run-btn:disabled,
+.run-modal .cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

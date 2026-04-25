@@ -1,0 +1,92 @@
+/* Card Component Styles */
+
+.card {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-normal);
+}
+
+/* Variants */
+.card-default {
+  background-color: var(--color-bg-secondary);
+}
+
+.card-elevated {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-border-default);
+}
+
+.card-ghost {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Padding */
+.card-padding-none {
+  padding: 0;
+}
+
+.card-padding-sm {
+  padding: var(--space-4);
+}
+
+.card-padding-md {
+  padding: var(--space-6);
+}
+
+.card-padding-lg {
+  padding: var(--space-8);
+}
+
+/* Hover effect */
+.card-hover:hover {
+  border-color: var(--color-border-default);
+  background-color: var(--color-bg-tertiary);
+}
+
+/* Clickable */
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:active {
+  transform: scale(0.995);
+}
+
+/* Card Header */
+.card-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Card Title */
+.card-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-fg-primary);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+/* Card Description */
+.card-description {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-tertiary);
+  line-height: var(--line-height-relaxed);
+}
+
+/* Card Content */
+.card-content {
+  margin-top: var(--space-4);
+}
+
+/* Card Footer */
+.card-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}

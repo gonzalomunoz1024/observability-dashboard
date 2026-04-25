@@ -1,0 +1,64 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.header-title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  color: var(--color-fg-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.header-stats {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.stat {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.stat.healthy {
+  background: rgba(52, 199, 89, 0.15);
+  color: var(--color-success);
+}
+
+.stat.unhealthy {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--color-error);
+}
+
+.stat.total {
+  background: var(--color-bg-tertiary);
+  color: var(--color-fg-tertiary);
+}
+
+.add-button {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.add-button:hover {
+  background: var(--color-accent-hover);
+}

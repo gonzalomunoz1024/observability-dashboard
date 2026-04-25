@@ -1,0 +1,101 @@
+server:
+  port: 3001
+
+spring:
+  application:
+    name: dashboard-server
+
+  cloud:
+    stream:
+      kafka:
+        binder:
+          brokers: ${KAFKA_BROKERS:localhost:9092}
+          auto-create-topics: true
+      default-binder: kafka
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+
+  # R2DBC Database Configuration
+  r2dbc:
+    url: r2dbc:h2:mem:///dashboard;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+
+  # H2 Console (for development)
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # SQL Initialization
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+  # Mail Configuration (SMTP)
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}
+          starttls:
+            enable: ${SMTP_STARTTLS:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+opensearch:
+  host: ${OPENSEARCH_HOST:localhost}
+  port: ${OPENSEARCH_PORT:9200}
+  scheme: ${OPENSEARCH_SCHEME:http}
+  username: ${OPENSEARCH_USERNAME:}
+  password: ${OPENSEARCH_PASSWORD:}
+  index: ${OPENSEARCH_INDEX:events}
+
+# Health Monitor Configuration
+health-monitor:
+  scheduler:
+    enabled: ${HEALTH_MONITOR_ENABLED:true}
+    initial-delay: 30000
+    fixed-rate: 60000
+  alerts:
+    consecutive-failures-threshold: 3
+    from-email: ${ALERT_FROM_EMAIL:dashboard-alerts@example.com}
+    default-recipients: ${ALERT_RECIPIENTS:ops-team@example.com}
+
+# Actuator (Health Endpoints for external monitoring)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: when_authorized
+  health:
+    mail:
+      enabled: false  # Don't fail health if mail server is down
+    r2dbc:
+      enabled: true
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: Dashboard Health Monitor
+    description: Server-side health monitoring with email alerts
+    version: 1.0.0
+
+logging:
+  level:
+    com.dashboard: DEBUG
+    org.springframework.cloud.stream: INFO

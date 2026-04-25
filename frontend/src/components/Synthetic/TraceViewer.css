@@ -1,0 +1,226 @@
+.trace-viewer {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.trace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+
+.trace-header h3 {
+  margin: 0;
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-lg);
+}
+
+.trace-status {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+}
+
+.status-complete {
+  background: rgba(52, 199, 89, 0.15);
+  color: var(--color-success);
+}
+
+.status-partial {
+  background: rgba(255, 149, 0, 0.15);
+  color: var(--color-warning);
+}
+
+.status-timeout {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--color-error);
+}
+
+.status-pending {
+  background: var(--color-bg-tertiary);
+  color: var(--color-fg-tertiary);
+}
+
+.trace-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-md);
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.meta-label {
+  font-size: 10px;
+  color: var(--color-fg-quaternary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.meta-value {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-primary);
+}
+
+.meta-value code {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+}
+
+.flow-visualization {
+  margin-bottom: var(--space-5);
+}
+
+.flow-visualization h4 {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-tertiary);
+}
+
+.flow-steps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.flow-step-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.step-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.step-completed {
+  background: rgba(52, 199, 89, 0.15);
+  color: var(--color-success);
+}
+
+.step-completed .step-indicator {
+  background: var(--color-success);
+  box-shadow: 0 0 6px var(--color-success);
+}
+
+.step-missing {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--color-error);
+}
+
+.step-missing .step-indicator {
+  background: var(--color-error);
+}
+
+.step-pending {
+  background: var(--color-bg-tertiary);
+  color: var(--color-fg-tertiary);
+}
+
+.step-pending .step-indicator {
+  background: var(--color-fg-tertiary);
+}
+
+.flow-arrow {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.arrow-completed {
+  color: var(--color-success);
+}
+
+.arrow-missing,
+.arrow-pending {
+  color: var(--color-fg-quaternary);
+}
+
+.events-list,
+.missing-steps {
+  margin-top: var(--space-5);
+}
+
+.events-list h4,
+.missing-steps h4 {
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-tertiary);
+}
+
+.events-table {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.events-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-tertiary);
+  font-size: 10px;
+  color: var(--color-fg-quaternary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.event-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: var(--font-size-sm);
+}
+
+.event-type {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.event-time {
+  color: var(--color-fg-tertiary);
+}
+
+.event-source {
+  color: var(--color-fg-quaternary);
+}
+
+.missing-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.missing-step {
+  padding: var(--space-2) var(--space-3);
+  background: rgba(255, 59, 48, 0.15);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+}

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Spec
+metadata:
+  name: test_suite_001md
+  createdAt: '2026-04-25T00:38:28.825Z'
+configuration:
+  appId: a
+  image: a
+  level: 2
+source:
+  repository: a
+  branch: a
+  entrypoint: a

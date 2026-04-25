@@ -1,0 +1,122 @@
+.health-summary {
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.summary-header {
+  margin-bottom: var(--space-4);
+}
+
+.summary-title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.health-matrix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.matrix-cell {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.matrix-cell:hover {
+  transform: scale(1.15);
+}
+
+.matrix-cell.healthy {
+  background: var(--color-success);
+  box-shadow: 0 0 8px rgba(52, 199, 89, 0.4);
+}
+
+.matrix-cell.unhealthy {
+  background: var(--color-error);
+  box-shadow: 0 0 8px rgba(255, 59, 48, 0.4);
+}
+
+.matrix-cell.checking {
+  background: var(--color-warning);
+  box-shadow: 0 0 8px rgba(255, 149, 0, 0.4);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.matrix-cell.unknown {
+  background: var(--color-fg-quaternary);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.stat-badge {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.stat-badge.healthy {
+  background: rgba(52, 199, 89, 0.15);
+  color: var(--color-success);
+}
+
+.stat-badge.unhealthy {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--color-error);
+}
+
+.stat-badge.unknown {
+  background: var(--color-bg-tertiary);
+  color: var(--color-fg-tertiary);
+}
+
+.stat-badge.response {
+  background: rgba(0, 122, 255, 0.15);
+  color: var(--color-accent);
+}
+
+.issues-section {
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-xs);
+  color: var(--color-error);
+}
+
+.issues-label {
+  font-weight: var(--font-weight-semibold);
+  margin-right: var(--space-2);
+  color: var(--color-error);
+}
+
+.issue-item {
+  color: var(--color-error);
+  opacity: 0.8;
+}
