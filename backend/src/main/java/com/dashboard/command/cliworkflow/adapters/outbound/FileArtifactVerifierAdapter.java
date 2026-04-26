@@ -31,28 +31,61 @@ public class FileArtifactVerifierAdapter implements ArtifactVerifierPort {
 
         // Check existence
         boolean exists = Files.exists(path);
-        if (check.isExists() && !exists) {
+        boolean isDirectory = Files.isDirectory(path);
+
+        // If expecting a directory, validate it's actually a directory
+        if (check.isDirectory() && exists && !isDirectory) {
             return ArtifactResult.builder()
                     .path(resolvedPath)
+                    .varName(check.getVarName())
+                    .resolvedPath(resolvedPath)
+                    .exists(true)
+                    .passed(false)
+                    .error("Expected directory but found file")
+                    .build();
+        }
+
+        if (check.isExists() && !exists) {
+            String type = check.isDirectory() ? "Directory" : "File";
+            return ArtifactResult.builder()
+                    .path(resolvedPath)
+                    .varName(check.getVarName())
+                    .resolvedPath(resolvedPath)
                     .exists(false)
                     .passed(false)
-                    .error("File does not exist")
+                    .error(type + " does not exist")
                     .build();
         }
 
         if (!check.isExists() && exists) {
+            String type = check.isDirectory() ? "Directory" : "File";
             return ArtifactResult.builder()
                     .path(resolvedPath)
+                    .varName(check.getVarName())
+                    .resolvedPath(resolvedPath)
                     .exists(true)
                     .passed(false)
-                    .error("File exists but should not")
+                    .error(type + " exists but should not")
                     .build();
         }
 
         if (!exists) {
             return ArtifactResult.builder()
                     .path(resolvedPath)
+                    .varName(check.getVarName())
+                    .resolvedPath(resolvedPath)
                     .exists(false)
+                    .passed(true)
+                    .build();
+        }
+
+        // For directories, we're done if it exists
+        if (check.isDirectory()) {
+            return ArtifactResult.builder()
+                    .path(resolvedPath)
+                    .varName(check.getVarName())
+                    .resolvedPath(resolvedPath)
+                    .exists(true)
                     .passed(true)
                     .build();
         }
@@ -67,6 +100,8 @@ public class FileArtifactVerifierAdapter implements ArtifactVerifierPort {
                     if (!content.contains(expected)) {
                         return ArtifactResult.builder()
                                 .path(resolvedPath)
+                                .varName(check.getVarName())
+                                .resolvedPath(resolvedPath)
                                 .exists(true)
                                 .passed(false)
                                 .error("File does not contain: " + expected)
@@ -82,6 +117,8 @@ public class FileArtifactVerifierAdapter implements ArtifactVerifierPort {
                 } catch (Exception e) {
                     return ArtifactResult.builder()
                             .path(resolvedPath)
+                            .varName(check.getVarName())
+                            .resolvedPath(resolvedPath)
                             .exists(true)
                             .passed(false)
                             .error("Invalid YAML: " + e.getMessage())
@@ -96,6 +133,8 @@ public class FileArtifactVerifierAdapter implements ArtifactVerifierPort {
                 } catch (Exception e) {
                     return ArtifactResult.builder()
                             .path(resolvedPath)
+                            .varName(check.getVarName())
+                            .resolvedPath(resolvedPath)
                             .exists(true)
                             .passed(false)
                             .error("Invalid JSON: " + e.getMessage())
@@ -105,6 +144,8 @@ public class FileArtifactVerifierAdapter implements ArtifactVerifierPort {
 
             return ArtifactResult.builder()
                     .path(resolvedPath)
+                    .varName(check.getVarName())
+                    .resolvedPath(resolvedPath)
                     .exists(true)
                     .passed(true)
                     .build();
@@ -113,6 +154,8 @@ public class FileArtifactVerifierAdapter implements ArtifactVerifierPort {
             log.error("Error verifying artifact {}: {}", resolvedPath, e.getMessage());
             return ArtifactResult.builder()
                     .path(resolvedPath)
+                    .varName(check.getVarName())
+                    .resolvedPath(resolvedPath)
                     .exists(true)
                     .passed(false)
                     .error("Error reading file: " + e.getMessage())

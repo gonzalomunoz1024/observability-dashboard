@@ -25,7 +25,16 @@ export const Sidebar = memo(function Sidebar({
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
         <h1 className="sidebar-logo">
-          <span className="logo-icon">OF</span>
+          <span className="logo-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              {/* Three pillars representing metrics, logs, traces */}
+              <rect x="3" y="10" width="4" height="10" rx="1" fill="currentColor" opacity="0.9"/>
+              <rect x="10" y="6" width="4" height="14" rx="1" fill="currentColor" opacity="0.7"/>
+              <rect x="17" y="4" width="4" height="16" rx="1" fill="currentColor" opacity="0.5"/>
+              {/* Pulse line overlay */}
+              <path d="M2 12h3l2-4 2 8 2-6 2 4h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+            </svg>
+          </span>
           {!collapsed && (
             <span className="logo-text">
               Observability

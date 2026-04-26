@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 function buildCommand(directory) {
   const dirPath = path.resolve(process.cwd(), directory);
@@ -35,6 +36,15 @@ function buildCommand(directory) {
     console.log(fs.readFileSync(specPath, 'utf8'));
   } else {
     console.log('Warning: spec.yaml not found');
+  }
+
+  // Run oc project to show current OpenShift project
+  console.log('--- OpenShift Project ---');
+  try {
+    const ocOutput = execSync('oc project', { encoding: 'utf8' });
+    console.log(ocOutput);
+  } catch (error) {
+    console.log('Warning: Could not get OpenShift project. Make sure you are logged in with "oc login"');
   }
 
   console.log('=== Build complete ===\n');

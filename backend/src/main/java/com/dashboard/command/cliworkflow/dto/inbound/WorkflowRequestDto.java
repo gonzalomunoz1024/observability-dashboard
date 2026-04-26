@@ -154,11 +154,13 @@ public class WorkflowRequestDto {
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ArtifactCheckDto {
+        private String varName;  // Optional: captures resolved path as variable
         private String path;
         @Builder.Default
         private boolean exists = true;
         private List<String> contains;
         private boolean yamlValid;
         private boolean jsonValid;
+        private boolean isDirectory;  // Validate as directory instead of file
     }
 }

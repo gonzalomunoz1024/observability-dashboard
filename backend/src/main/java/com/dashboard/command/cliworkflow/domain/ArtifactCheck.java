@@ -12,10 +12,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ArtifactCheck {
+    private String varName;  // Optional: if set, captures the resolved path as a variable
     private String path;
     @Builder.Default
     private boolean exists = true;
     private List<String> contains;
     private boolean yamlValid;
     private boolean jsonValid;
+    private boolean isDirectory;  // If true, validates as directory instead of file
 }

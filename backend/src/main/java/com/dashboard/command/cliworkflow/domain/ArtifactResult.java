@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ArtifactResult {
     private String path;
+    private String varName;       // Variable name if artifact captures a variable
+    private String resolvedPath;  // Full resolved path for variable capture
     private boolean exists;
     private boolean passed;
     private String error;

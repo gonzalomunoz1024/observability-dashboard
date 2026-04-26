@@ -68,6 +68,8 @@ public class WorkflowResultDto {
     @AllArgsConstructor
     public static class ArtifactResultDto {
         private String path;
+        private String varName;
+        private String resolvedPath;
         private boolean exists;
         private boolean passed;
         private String error;

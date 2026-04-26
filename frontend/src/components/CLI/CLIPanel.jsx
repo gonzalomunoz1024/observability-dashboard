@@ -3,16 +3,18 @@ import { WorkflowBuilder } from './WorkflowBuilder';
 import { RunModal } from './RunModal';
 import { CLIResults } from './CLIResults';
 import { runWorkflow, uploadExecutable } from '../../utils/cli';
-import { getSavedWorkflows } from '../../utils/workflowStorage';
+import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory } from '../../utils/workflowStorage';
+import { formatWorkflowForExecution } from '../../utils/workflowFormatter';
 import './CLIPanel.css';
 
 export function CLIPanel({ serviceId }) {
   const [activeTab, setActiveTab] = useState('execute'); // 'execute' | 'create'
   const [savedTests, setSavedTests] = useState([]);
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState(() => getExecutionHistory());
   const [error, setError] = useState(null);
   const [isRunning, setIsRunning] = useState(null);
-  const [testToRun, setTestToRun] = useState(null);
+  const [testsToRun, setTestsToRun] = useState([]); // Changed to array
+  const [selectedTests, setSelectedTests] = useState([]); // For multi-select
   const [workflowToEdit, setWorkflowToEdit] = useState(null);
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export function CLIPanel({ serviceId }) {
         }
       }));
 
+
       const normalizedResult = {
         passed: result?.passed ?? false,
         summary: result?.summary || { total: 0, passed: 0, failed: 0, passRate: '0%' },
@@ -72,7 +75,8 @@ export function CLIPanel({ serviceId }) {
         executable: executableName
       };
 
-      setResults((prev) => [normalizedResult, ...prev].slice(0, 20));
+      const updated = saveExecutionResult(normalizedResult);
+      setResults(updated);
     } catch (err) {
       setError(err.message || 'Failed to run test. Make sure the backend server is running.');
     } finally {
@@ -80,84 +84,67 @@ export function CLIPanel({ serviceId }) {
     }
   };
 
-  const formatWorkflowForExecution = (workflow, executable) => {
-    const env = workflow.envVars
-      ? Object.fromEntries(
-          workflow.envVars.split('\n').filter(Boolean).map((line) => {
-            const [key, ...vals] = line.split('=');
-            return [key.trim(), vals.join('=').trim()];
-          })
-        )
-      : undefined;
-
-    return {
-      name: workflow.name,
-      env,
-      steps: workflow.steps.map((step) => ({
-        id: step.id,
-        name: step.name || step.id,
-        executable,
-        args: step.args ? step.args.split(' ').filter(Boolean) : [],
-        timeout: step.timeout,
-        dependsOn: step.dependsOn ? step.dependsOn.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
-        stdinInputs: step.stdinInputs ? step.stdinInputs.split('\n').filter(Boolean) : undefined,
-        stdinDelay: step.stdinDelay,
-        expectations: {
-          exitCode: step.expectations?.exitCode !== '' ? parseInt(step.expectations?.exitCode, 10) : undefined,
-          stdoutContains: step.expectations?.stdoutContains
-            ? step.expectations.stdoutContains.split(',').map((s) => s.trim()).filter(Boolean)
-            : undefined,
-          stdoutMatches: step.expectations?.stdoutMatches || undefined,
-          stderrEmpty: step.expectations?.stderrEmpty || undefined,
-          stderrContains: step.expectations?.stderrContains
-            ? step.expectations.stderrContains.split(',').map((s) => s.trim()).filter(Boolean)
-            : undefined,
-          maxDuration: step.expectations?.maxDuration ? parseInt(step.expectations.maxDuration, 10) : undefined,
-        },
-        capture: step.capture ? parseCapture(step.capture) : undefined,
-        artifacts: step.artifacts ? parseArtifacts(step.artifacts) : undefined,
-      })),
-    };
-  };
-
-  const parseCapture = (captureStr) => {
-    if (!captureStr) return undefined;
-    try {
-      const lines = captureStr.split('\n').filter(Boolean);
-      const result = {};
-      lines.forEach((line) => {
-        const match = line.match(/^(\w+):\s*(.+)$/);
-        if (match) {
-          result[match[1]] = { source: 'stdout', regex: match[2] };
-        }
-      });
-      return Object.keys(result).length > 0 ? result : undefined;
-    } catch {
-      return undefined;
-    }
-  };
-
-  const parseArtifacts = (artifactsStr) => {
-    if (!artifactsStr) return undefined;
-    try {
-      const lines = artifactsStr.split('\n').filter(Boolean);
-      return lines.map((line) => {
-        const parts = line.split('|').map((p) => p.trim());
-        return {
-          path: parts[0],
-          exists: true,
-          contains: parts[1] ? parts[1].split(',').map((s) => s.trim()) : undefined,
-          yamlValid: parts.includes('yaml'),
-          jsonValid: parts.includes('json'),
-        };
-      });
-    } catch {
-      return undefined;
-    }
-  };
-
   const clearResults = () => {
+    clearExecutionHistory();
     setResults([]);
+  };
+
+  // Handle results from RunModal for Execution History
+  const handleTestResult = (workflow, result, executablePath) => {
+    const steps = result?.steps || result?.results || [];
+    const transformedResults = steps.map(step => ({
+      ...step,
+      name: step.name || step.id,
+      args: step.args,
+      exitCode: step.exitCode,
+      stdout: step.stdout,
+      stderr: step.stderr,
+      duration: step.duration,
+      validation: {
+        passed: step.passed ?? false,
+        validations: step.validations || []
+      }
+    }));
+
+    const normalizedResult = {
+      passed: result?.passed ?? false,
+      summary: result?.summary || {
+        total: steps.length,
+        passed: steps.filter(s => s.passed).length,
+        failed: steps.filter(s => !s.passed).length,
+        passRate: steps.length > 0 ? `${Math.round(steps.filter(s => s.passed).length / steps.length * 100)}%` : '0%'
+      },
+      results: transformedResults,
+      timestamp: new Date().toISOString(),
+      workflowName: workflow.name,
+      executable: executablePath
+    };
+
+    const updated = saveExecutionResult(normalizedResult);
+    setResults(updated);
+  };
+
+  const toggleTestSelection = (testId) => {
+    setSelectedTests(prev =>
+      prev.includes(testId)
+        ? prev.filter(id => id !== testId)
+        : [...prev, testId]
+    );
+  };
+
+  const selectAllTests = () => {
+    if (selectedTests.length === savedTests.length) {
+      setSelectedTests([]);
+    } else {
+      setSelectedTests(savedTests.map(t => t.id));
+    }
+  };
+
+  const runSelectedTests = () => {
+    const testsToExecute = savedTests.filter(t => selectedTests.includes(t.id));
+    if (testsToExecute.length > 0) {
+      setTestsToRun(testsToExecute);
+    }
   };
 
   return (
@@ -171,7 +158,7 @@ export function CLIPanel({ serviceId }) {
         </button>
         <button
           className={`cli-tab ${activeTab === 'create' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('create'); loadSavedTests(); }}
+          onClick={() => { setActiveTab('create'); setWorkflowToEdit(null); loadSavedTests(); }}
         >
           Create
         </button>
@@ -183,6 +170,11 @@ export function CLIPanel({ serviceId }) {
             <div className="execute-sidebar">
               <div className="sidebar-header">
                 <h3>Test Suites</h3>
+                {savedTests.length > 0 && selectedTests.length > 0 && (
+                  <button className="run-selected-btn" onClick={runSelectedTests}>
+                    Run Selected ({selectedTests.length})
+                  </button>
+                )}
               </div>
 
               {savedTests.length === 0 ? (
@@ -193,34 +185,52 @@ export function CLIPanel({ serviceId }) {
                   </button>
                 </div>
               ) : (
-                <div className="suite-list">
-                  {savedTests.map((test) => (
-                    <div key={test.id} className="suite-item">
-                      <div className="suite-info">
-                        <span className="suite-name">{test.name}</span>
-                        <span className="suite-meta">{test.steps?.length || 0} steps</span>
+                <>
+                  <div className="suite-list-header">
+                    <label className="select-all-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={selectedTests.length === savedTests.length}
+                        onChange={selectAllTests}
+                      />
+                      Select All
+                    </label>
+                  </div>
+                  <div className="suite-list">
+                    {savedTests.map((test) => (
+                      <div key={test.id} className={`suite-item ${selectedTests.includes(test.id) ? 'selected' : ''}`}>
+                        <input
+                          type="checkbox"
+                          className="suite-checkbox"
+                          checked={selectedTests.includes(test.id)}
+                          onChange={() => toggleTestSelection(test.id)}
+                        />
+                        <div className="suite-info">
+                          <span className="suite-name">{test.name}</span>
+                          <span className="suite-meta">{test.steps?.length || 0} steps</span>
+                        </div>
+                        <div className="suite-actions">
+                          <button
+                            className="edit-btn"
+                            onClick={() => {
+                              setWorkflowToEdit(test);
+                              setActiveTab('create');
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="run-btn"
+                            onClick={() => setTestsToRun([test])}
+                            disabled={isRunning === test.id}
+                          >
+                            {isRunning === test.id ? '...' : 'Run'}
+                          </button>
+                        </div>
                       </div>
-                      <div className="suite-actions">
-                        <button
-                          className="edit-btn"
-                          onClick={() => {
-                            setWorkflowToEdit(test);
-                            setActiveTab('create');
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="run-btn"
-                          onClick={() => setTestToRun(test)}
-                          disabled={isRunning === test.id}
-                        >
-                          {isRunning === test.id ? '...' : 'Run'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
 
@@ -283,14 +293,14 @@ export function CLIPanel({ serviceId }) {
         )}
       </div>
 
-      {testToRun && (
+      {testsToRun.length > 0 && (
         <RunModal
-          testName={testToRun.name}
-          onRun={async (executable, options) => {
-            await handleRunTest(testToRun, executable, options);
-            setTestToRun(null);
+          tests={testsToRun}
+          onResult={handleTestResult}
+          onClose={() => {
+            setTestsToRun([]);
+            setSelectedTests([]);
           }}
-          onClose={() => setTestToRun(null)}
         />
       )}
     </div>

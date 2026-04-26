@@ -491,6 +491,13 @@ public class DefaultExecuteWorkflowUseCase implements ExecuteWorkflowPort {
                     boolean artifactsPassed = artifactResults.isEmpty() ||
                             artifactResults.stream().allMatch(ArtifactResult::isPassed);
 
+                    // Capture variables from successful artifact verifications
+                    for (ArtifactResult ar : artifactResults) {
+                        if (ar.isPassed() && ar.getVarName() != null && ar.getResolvedPath() != null) {
+                            capturedVariables.put(ar.getVarName(), ar.getResolvedPath());
+                        }
+                    }
+
                     return StepResult.builder()
                             .id(step.getId())
                             .name(step.getName())
@@ -584,9 +591,21 @@ public class DefaultExecuteWorkflowUseCase implements ExecuteWorkflowPort {
             return Flux.empty();
         }
 
+        String workDir = variables.get("workDir");
+
         return Flux.fromIterable(artifacts)
                 .flatMap(check -> {
                     String resolvedPath = resolveVariables(check.getPath(), variables);
+
+                    // Resolve relative paths against workDir
+                    if (workDir != null && resolvedPath != null) {
+                        if (resolvedPath.startsWith("./")) {
+                            resolvedPath = workDir + resolvedPath.substring(1);
+                        } else if (!resolvedPath.startsWith("/")) {
+                            resolvedPath = workDir + "/" + resolvedPath;
+                        }
+                    }
+
                     return artifactVerifier.verify(check, resolvedPath);
                 });
     }

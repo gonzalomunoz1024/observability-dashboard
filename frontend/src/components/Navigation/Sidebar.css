@@ -49,10 +49,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-fg-primary);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  color: var(--color-bg-primary);
+  color: var(--color-accent);
+}
+
+.logo-icon svg {
+  width: 24px;
+  height: 24px;
 }
 
 .logo-text {

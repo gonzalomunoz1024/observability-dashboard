@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cleanCliOutput } from '../../utils/outputCleaner';
 import './CLIResults.css';
 
 export function CLIResults({ result }) {
@@ -48,9 +49,30 @@ export function CLIResults({ result }) {
       if (v.type === 'stdoutContains') return `Missing in output: "${v.expected}"`;
       if (v.type === 'stderrEmpty') return 'Stderr was not empty';
       if (v.type === 'maxDuration') return `Took ${v.actual}ms (max: ${v.expected}ms)`;
+      if (v.type === 'statusCode') return `Status: expected ${v.expected}, got ${v.actual}`;
       return v.type;
     }).join(', ');
   };
+
+  // Try to pretty print JSON and add line numbers
+  const formatJsonOutput = (output) => {
+    if (!output) return null;
+    try {
+      const parsed = JSON.parse(output);
+      const pretty = JSON.stringify(parsed, null, 2);
+      const lines = pretty.split('\n');
+      return {
+        formatted: lines.map((line, i) => `${String(i + 1).padStart(3, ' ')} │ ${line}`).join('\n'),
+        lineCount: lines.length,
+        isJson: true
+      };
+    } catch {
+      return { formatted: output, lineCount: output.split('\n').length, isJson: false };
+    }
+  };
+
+  // Check if step is HTTP type
+  const isHttpStep = (test) => test?.type === 'http' || test?.http;
 
   return (
     <div className="cli-results">
@@ -105,7 +127,13 @@ export function CLIResults({ result }) {
 
             {expandedTests[index] && (
               <div className="test-details">
-                {test?.args && (
+                {isHttpStep(test) && test?.http?.url && (
+                  <div className="detail-section">
+                    <h5>Request</h5>
+                    <code>{test.http.method || 'GET'} {test.http.url}</code>
+                  </div>
+                )}
+                {!isHttpStep(test) && test?.args && (
                   <div className="detail-section">
                     <h5>Command</h5>
                     <code>{Array.isArray(test.args) ? test.args.join(' ') : test.args}</code>
@@ -113,22 +141,63 @@ export function CLIResults({ result }) {
                 )}
 
                 <div className="detail-row">
-                  <div className="detail-section">
-                    <h5>Exit Code</h5>
-                    <span className={test?.exitCode === 0 ? 'success' : 'error'}>
-                      {test?.exitCode ?? 'N/A'}
-                    </span>
-                  </div>
-                  <div className="detail-section">
-                    <h5>Duration</h5>
-                    <span>{test?.duration || 0}ms</span>
-                  </div>
+                  {isHttpStep(test) ? (
+                    <>
+                      <div className="detail-section">
+                        <h5>Status Code</h5>
+                        <span className={test?.statusCode < 400 ? 'success' : 'error'}>
+                          {test?.statusCode ?? 'N/A'}
+                        </span>
+                      </div>
+                      <div className="detail-section">
+                        <h5>Duration</h5>
+                        <span>{test?.duration || test?.pollDuration || 0}ms</span>
+                        {test?.pollAttempts > 1 && (
+                          <span className="poll-info"> ({test.pollAttempts} attempts)</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="detail-section">
+                        <h5>Exit Code</h5>
+                        <span className={test?.exitCode === 0 ? 'success' : 'error'}>
+                          {test?.exitCode ?? 'N/A'}
+                        </span>
+                      </div>
+                      <div className="detail-section">
+                        <h5>Duration</h5>
+                        <span>{test?.duration || 0}ms</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                {test?.stdout && (
+                {/* HTTP Response */}
+                {isHttpStep(test) && (test?.responseBody || test?.statusCode) && (
+                  <div className="detail-section">
+                    <h5>Response</h5>
+                    {test.statusCode && (
+                      <div className="http-status">
+                        Status: <span className={test.statusCode < 400 ? 'success' : 'error'}>{test.statusCode}</span>
+                      </div>
+                    )}
+                    {test.responseBody && (() => {
+                      const formatted = formatJsonOutput(test.responseBody);
+                      return (
+                        <pre className={`output json-output ${formatted.lineCount > 20 ? 'scrollable' : ''}`}>
+                          {formatted.formatted}
+                        </pre>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Command stdout */}
+                {!isHttpStep(test) && test?.stdout && (
                   <div className="detail-section">
                     <h5>stdout</h5>
-                    <pre className="output">{test.stdout}</pre>
+                    <pre className="output">{cleanCliOutput(test.stdout)}</pre>
                   </div>
                 )}
 

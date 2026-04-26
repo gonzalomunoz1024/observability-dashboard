@@ -115,11 +115,13 @@ public class RestControllerWorkflowInboundAdapter {
         if (dto.getArtifacts() != null) {
             artifacts = dto.getArtifacts().stream()
                     .map(a -> ArtifactCheck.builder()
+                            .varName(a.getVarName())
                             .path(a.getPath())
                             .exists(a.isExists())
                             .contains(a.getContains())
                             .yamlValid(a.isYamlValid())
                             .jsonValid(a.isJsonValid())
+                            .isDirectory(a.isDirectory())
                             .build())
                     .collect(Collectors.toList());
         }
@@ -225,6 +227,8 @@ public class RestControllerWorkflowInboundAdapter {
             artifactDtos = result.getArtifactResults().stream()
                     .map(a -> WorkflowResultDto.ArtifactResultDto.builder()
                             .path(a.getPath())
+                            .varName(a.getVarName())
+                            .resolvedPath(a.getResolvedPath())
                             .exists(a.isExists())
                             .passed(a.isPassed())
                             .error(a.getError())

@@ -53,8 +53,40 @@ export async function runWorkflow(workflow) {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to run workflow');
+    let errorMessage = 'Failed to run workflow';
+    try {
+      const error = await response.json();
+      errorMessage = error.message || error.error || errorMessage;
+    } catch {
+      const text = await response.text();
+      errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+// Workflow execution with progress callbacks (uses regular endpoint, animates results)
+export async function runWorkflowWithProgress(workflow, onStepStart, onStepComplete, onError) {
+  const url = `${PROXY_URL}/api/cli/workflow`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(workflow),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Failed to run workflow';
+    try {
+      const error = await response.json();
+      errorMessage = error.message || error.error || errorMessage;
+    } catch {
+      const text = await response.text();
+      errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
 
   return response.json();
