@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { WorkflowBuilder } from './WorkflowBuilder';
 import { RunModal } from './RunModal';
 import { CLIResults } from './CLIResults';
-import { runWorkflow, uploadExecutable } from '../../utils/cli';
 import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory } from '../../utils/workflowStorage';
-import { formatWorkflowForExecution } from '../../utils/workflowFormatter';
 import './CLIPanel.css';
 
 export function CLIPanel({ serviceId }) {
@@ -23,65 +21,6 @@ export function CLIPanel({ serviceId }) {
 
   const loadSavedTests = () => {
     setSavedTests(getSavedWorkflows());
-  };
-
-  const handleRunTest = async (workflow, executable, options = {}) => {
-    setError(null);
-    setIsRunning(workflow.id);
-
-    try {
-      // If executable is a File, upload it first to get the server path
-      let executablePath = executable;
-      let executableName = 'CLI';
-
-      if (executable instanceof File) {
-        const uploadResult = await uploadExecutable(executable);
-        executablePath = uploadResult.path;
-        executableName = executable.name;
-      } else if (typeof executable === 'string') {
-        executablePath = executable;
-        executableName = executable;
-      }
-
-      const formatted = formatWorkflowForExecution(workflow, executablePath);
-      const result = await runWorkflow(formatted);
-
-      // Transform backend response to expected structure
-      // Backend returns: { steps: [...], summary: {...}, passed: bool }
-      // Frontend expects: { results: [...], summary: {...}, passed: bool }
-      // where each result has { validation: { passed, validations: [...] }, ... }
-      const steps = result?.steps || result?.results || [];
-      const transformedResults = steps.map(step => ({
-        ...step,
-        name: step.name || step.id,
-        args: step.args,
-        exitCode: step.exitCode,
-        stdout: step.stdout,
-        stderr: step.stderr,
-        duration: step.duration,
-        validation: {
-          passed: step.passed ?? false,
-          validations: step.validations || []
-        }
-      }));
-
-
-      const normalizedResult = {
-        passed: result?.passed ?? false,
-        summary: result?.summary || { total: 0, passed: 0, failed: 0, passRate: '0%' },
-        results: transformedResults,
-        timestamp: new Date().toISOString(),
-        workflowName: workflow.name,
-        executable: executableName
-      };
-
-      const updated = saveExecutionResult(normalizedResult);
-      setResults(updated);
-    } catch (err) {
-      setError(err.message || 'Failed to run test. Make sure the backend server is running.');
-    } finally {
-      setIsRunning(null);
-    }
   };
 
   const clearResults = () => {

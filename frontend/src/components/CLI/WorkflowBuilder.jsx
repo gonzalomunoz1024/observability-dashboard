@@ -104,16 +104,6 @@ export function WorkflowBuilder({ onSave: onSaveCallback, onSaveComplete, initia
     }
   };
 
-  const handleNew = () => {
-    setWorkflowId(null);
-    setWorkflowName('');
-    setVariables([]);
-    setEnvVars('');
-    setSetupCommands([]);
-    setSteps([{ ...defaultStep, id: 'Step 1' }]);
-    setError(null);
-  };
-
   // Variable management functions
   const addVariable = () => {
     setVariables([...variables, { name: '', defaultValue: '', description: '' }]);
