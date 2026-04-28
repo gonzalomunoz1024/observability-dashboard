@@ -2,12 +2,12 @@ apiVersion: v1
 kind: Spec
 metadata:
   name: test_suite_001
-  createdAt: '2026-04-24T23:32:14.426Z'
+  createdAt: '2026-04-28T18:04:47.583Z'
 configuration:
-  appId: a
-  image: b
+  appId: claut
+  image: image
   level: 1
 source:
-  repository: lad
-  branch: da
-  entrypoint: das
+  repository: url
+  branch: main
+  entrypoint: main

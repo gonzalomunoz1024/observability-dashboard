@@ -2,11 +2,11 @@ apiVersion: v1
 kind: Catalog
 metadata:
   name: test_suite_001
-  appId: a
+  appId: claut
 spec:
-  image: b
+  image: image
   selection: 1
   playbook:
-    url: lad
-    branch: da
-    fileName: das
+    url: url
+    branch: main
+    fileName: main

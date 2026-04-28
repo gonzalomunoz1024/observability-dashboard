@@ -69,18 +69,46 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
     const startTime = Date.now();
     let stdout = '';
     let stderr = '';
+    let resolved = false;
+    let timeoutHandle = null;
+
+    // Debug: Log all inputs
+    console.log('[runCommandStep] Step:', JSON.stringify(step, null, 2));
+    console.log('[runCommandStep] Executable:', executablePath);
+    console.log('[runCommandStep] WorkDir:', workDir);
+    console.log('[runCommandStep] Variables:', variables);
 
     // Interpolate variables in args
     const args = interpolateVariables(step.args || '', variables);
     const argsArray = args.split(/\s+/).filter(a => a);
 
-    onOutput({ type: 'info', message: `Running: ${executablePath} ${args}` });
+    console.log('[runCommandStep] Raw args:', step.args);
+    console.log('[runCommandStep] Interpolated args:', args);
+    console.log('[runCommandStep] Args array:', argsArray);
+
+    onOutput({ type: 'stdout', data: `[DEBUG] Executable: ${executablePath}\n` });
+    onOutput({ type: 'stdout', data: `[DEBUG] Args array: ${JSON.stringify(argsArray)}\n` });
+    onOutput({ type: 'stdout', data: `[DEBUG] Working dir: ${workDir}\n` });
+    onOutput({ type: 'stdout', data: `[INFO] Running: ${executablePath} ${args}\n` });
 
     const proc = spawn(executablePath, argsArray, {
       cwd: workDir,
-      env: { ...process.env, ...parseEnvVars(step.envVars) },
-      timeout: step.timeout || 30000
+      env: { ...process.env, ...parseEnvVars(step.envVars) }
     });
+
+    // Explicit timeout handling
+    const timeoutMs = step.timeout || 30000;
+    timeoutHandle = setTimeout(() => {
+      if (!resolved) {
+        onOutput({ type: 'stderr', data: `[TIMEOUT] Process exceeded ${timeoutMs}ms timeout, killing...\n` });
+        proc.kill('SIGTERM');
+        setTimeout(() => {
+          if (!resolved) {
+            proc.kill('SIGKILL');
+          }
+        }, 5000); // Force kill after 5 more seconds
+      }
+    }, timeoutMs);
 
     proc.stdout.on('data', (data) => {
       const text = data.toString();
@@ -96,18 +124,28 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
 
     // Handle stdin inputs if configured
     if (step.stdinInputs) {
+      console.log('[runCommandStep] Raw stdinInputs:', JSON.stringify(step.stdinInputs));
+
       // Interpolate variables in stdin inputs
       const interpolatedInputs = interpolateVariables(step.stdinInputs, variables);
+      console.log('[runCommandStep] Interpolated stdinInputs:', JSON.stringify(interpolatedInputs));
+
       const inputs = interpolatedInputs.split('\n').filter(line => line !== '');
+      console.log('[runCommandStep] Stdin inputs array:', inputs);
+
       let inputIndex = 0;
 
-      onOutput({ type: 'info', message: `Sending ${inputs.length} stdin input(s)` });
+      onOutput({ type: 'stdout', data: `[DEBUG] Raw stdinInputs: ${JSON.stringify(step.stdinInputs)}\n` });
+      onOutput({ type: 'stdout', data: `[DEBUG] Interpolated stdinInputs: ${JSON.stringify(interpolatedInputs)}\n` });
+      onOutput({ type: 'stdout', data: `[DEBUG] Stdin inputs array (${inputs.length} items): ${JSON.stringify(inputs)}\n` });
+      onOutput({ type: 'stdout', data: `[INFO] Sending ${inputs.length} stdin input(s) with ${step.stdinDelay || 100}ms delay\n` });
 
       const sendInput = () => {
-        if (inputIndex < inputs.length) {
+        if (inputIndex < inputs.length && !resolved) {
           setTimeout(() => {
+            if (resolved) return;
             const input = inputs[inputIndex];
-            onOutput({ type: 'stdin', data: `> ${input}` });
+            onOutput({ type: 'stdout', data: `[STDIN] > ${input}\n` });
             proc.stdin.write(input + '\n');
             inputIndex++;
             sendInput();
@@ -117,9 +155,17 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
       sendInput();
     }
 
-    proc.on('close', (code) => {
+    proc.on('close', (code, signal) => {
+      if (resolved) return;
+      resolved = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+
       const duration = Date.now() - startTime;
-      const exitCode = code ?? -1;
+      const exitCode = code ?? (signal ? -1 : -1);
+
+      if (signal) {
+        onOutput({ type: 'stderr', data: `[INFO] Process terminated by signal: ${signal}\n` });
+      }
 
       // Run validations
       const validations = [];
@@ -184,7 +230,11 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
     });
 
     proc.on('error', (err) => {
-      onOutput({ type: 'error', message: err.message });
+      if (resolved) return;
+      resolved = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+
+      onOutput({ type: 'stderr', data: `[ERROR] ${err.message}\n` });
       resolve({
         id: step.id,
         name: step.name || step.id,
@@ -218,6 +268,11 @@ function parseEnvVars(envVarsString) {
 app.post('/api/cli/workflow/stream', async (req, res) => {
   const workflow = req.body;
   const streamId = uuidv4();
+
+  console.log('\n========== NEW WORKFLOW EXECUTION ==========');
+  console.log('[/api/cli/workflow/stream] Received workflow:');
+  console.log(JSON.stringify(workflow, null, 2));
+  console.log('=============================================\n');
 
   // Set up SSE
   res.setHeader('Content-Type', 'text/event-stream');
