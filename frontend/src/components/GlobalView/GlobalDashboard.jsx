@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { useServices } from '../../context/ServicesContext';
 import { StatusIndicator } from '../Dashboard/StatusIndicator';
+import { getSavedWorkflows } from '../../utils/workflowStorage';
 import './GlobalDashboard.css';
 
 /**
@@ -112,19 +113,25 @@ export const GlobalDashboard = memo(function GlobalDashboard({
         <div className="services-section">
           <h3>CLI Tools</h3>
           <div className="services-grid">
-            {cliServices.map(service => (
-              <div
-                key={service.id}
-                className="service-card cli"
-                onClick={() => onSelectService(service.id)}
-              >
-                <div className="card-header">
-                  <span className="card-title">{service.name}</span>
-                  <span className="status-dot cli" />
+            {cliServices.map(service => {
+              const testSuites = getSavedWorkflows(service.id);
+              const suiteCount = testSuites.length;
+              return (
+                <div
+                  key={service.id}
+                  className="service-card cli"
+                  onClick={() => onSelectService(service.id)}
+                >
+                  <div className="card-header">
+                    <span className="card-title">{service.name}</span>
+                    <span className="status-dot cli" />
+                  </div>
+                  <div className="card-url">
+                    {suiteCount === 0 ? 'No test suites' : `${suiteCount} test suite${suiteCount !== 1 ? 's' : ''}`}
+                  </div>
                 </div>
-                <div className="card-url">{service.executable || 'No executable'}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
