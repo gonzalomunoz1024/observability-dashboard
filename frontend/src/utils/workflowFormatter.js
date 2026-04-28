@@ -154,15 +154,15 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
         };
       }
 
-      // Command steps
+      // Command steps - keep args and stdinInputs as strings for server-side processing
       return {
         id: step.id,
         name: step.name || step.id,
         executable,
-        args: step.args ? step.args.split(' ').filter(Boolean) : [],
+        args: step.args || '',
         timeout: step.timeout,
         dependsOn: autoDeps,
-        stdinInputs: step.stdinInputs ? step.stdinInputs.split('\n').filter(Boolean) : undefined,
+        stdinInputs: step.stdinInputs || undefined,
         stdinDelay: step.stdinDelay,
         expectations: buildExpectations(step.expectations),
         capture: step.capture ? parseCapture(step.capture) : undefined,
