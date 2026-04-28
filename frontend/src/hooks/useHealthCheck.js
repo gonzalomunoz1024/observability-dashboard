@@ -53,7 +53,9 @@ export function useHealthCheck() {
   useEffect(() => {
     const intervals = intervalsRef.current;
 
+    // Only poll services that have a URL configured (skip CLI services)
     services.forEach((service) => {
+      if (!service.url) return; // Skip services without health check URLs
       if (!intervals[service.id]) {
         startPolling(service);
       }
