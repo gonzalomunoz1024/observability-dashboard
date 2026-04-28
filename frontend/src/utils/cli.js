@@ -92,6 +92,92 @@ export async function runWorkflowWithProgress(workflow, onStepStart, onStepCompl
   return response.json();
 }
 
+// Workflow execution with SSE streaming for live output
+export function runWorkflowStreaming(workflow, callbacks) {
+  const { onStart, onStepStart, onOutput, onStepComplete, onComplete, onError } = callbacks;
+
+  return new Promise((resolve, reject) => {
+    fetch(`${PROXY_URL}/api/cli/workflow/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workflow),
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      function processEvents() {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            resolve();
+            return;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          let currentEvent = null;
+          let currentData = '';
+
+          lines.forEach(line => {
+            if (line.startsWith('event: ')) {
+              currentEvent = line.slice(7);
+            } else if (line.startsWith('data: ')) {
+              currentData = line.slice(6);
+              if (currentEvent && currentData) {
+                try {
+                  const data = JSON.parse(currentData);
+                  switch (currentEvent) {
+                    case 'start':
+                      onStart?.(data);
+                      break;
+                    case 'stepStart':
+                      onStepStart?.(data.stepId, data);
+                      break;
+                    case 'output':
+                      onOutput?.(data.stepId, data);
+                      break;
+                    case 'stepComplete':
+                      onStepComplete?.(data.stepId, data.result);
+                      break;
+                    case 'complete':
+                      onComplete?.(data);
+                      break;
+                    case 'error':
+                      onError?.(data.message);
+                      break;
+                    default:
+                      break;
+                  }
+                } catch (e) {
+                  console.warn('Failed to parse SSE data:', e);
+                }
+              }
+              currentEvent = null;
+              currentData = '';
+            }
+          });
+
+          processEvents();
+        }).catch(err => {
+          onError?.(err.message);
+          reject(err);
+        });
+      }
+
+      processEvents();
+    }).catch(err => {
+      onError?.(err.message);
+      reject(err);
+    });
+  });
+}
+
 export async function runSuiteParallel(name, tests = []) {
   const response = await fetch(`${PROXY_URL}/api/cli/suite/parallel`, {
     method: 'POST',

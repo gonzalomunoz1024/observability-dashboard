@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Catalog
+metadata:
+  name: test_
+  appId: '1'
+spec:
+  image: '1'
+  selection: 1
+  playbook:
+    url: s
+    branch: a
+    fileName: a

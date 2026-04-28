@@ -1,30 +1,41 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WorkflowBuilder } from './WorkflowBuilder';
 import { RunModal } from './RunModal';
 import { CLIResults } from './CLIResults';
-import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory } from '../../utils/workflowStorage';
+import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory, exportWorkflows, importWorkflows } from '../../utils/workflowStorage';
 import './CLIPanel.css';
 
 export function CLIPanel({ serviceId }) {
-  const [activeTab, setActiveTab] = useState('execute'); // 'execute' | 'create'
   const [savedTests, setSavedTests] = useState([]);
-  const [results, setResults] = useState(() => getExecutionHistory());
+  const [activeTab, setActiveTab] = useState(() => {
+    // Auto-select 'create' tab if no tests exist for this service
+    const tests = getSavedWorkflows(serviceId);
+    return tests.length === 0 ? 'create' : 'execute';
+  });
+  const [results, setResults] = useState(() => getExecutionHistory(serviceId));
   const [error, setError] = useState(null);
   const [isRunning, setIsRunning] = useState(null);
   const [testsToRun, setTestsToRun] = useState([]); // Changed to array
   const [selectedTests, setSelectedTests] = useState([]); // For multi-select
   const [workflowToEdit, setWorkflowToEdit] = useState(null);
+  const [importStatus, setImportStatus] = useState(null); // { type: 'success' | 'error', message: string }
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadSavedTests();
-  }, []);
+  }, [serviceId]);
 
   const loadSavedTests = () => {
-    setSavedTests(getSavedWorkflows());
+    const tests = getSavedWorkflows(serviceId);
+    setSavedTests(tests);
+    // Auto-switch to create tab if no tests exist
+    if (tests.length === 0) {
+      setActiveTab('create');
+    }
   };
 
   const clearResults = () => {
-    clearExecutionHistory();
+    clearExecutionHistory(serviceId);
     setResults([]);
   };
 
@@ -59,7 +70,7 @@ export function CLIPanel({ serviceId }) {
       executable: executablePath
     };
 
-    const updated = saveExecutionResult(normalizedResult);
+    const updated = saveExecutionResult(normalizedResult, serviceId);
     setResults(updated);
   };
 
@@ -86,6 +97,43 @@ export function CLIPanel({ serviceId }) {
     }
   };
 
+  const handleExport = () => {
+    const jsonData = exportWorkflows(serviceId);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `test-suites-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = importWorkflows(e.target.result, serviceId);
+        loadSavedTests();
+        setImportStatus({
+          type: 'success',
+          message: `Imported ${result.imported} test suite(s)${result.skipped > 0 ? `, ${result.skipped} skipped` : ''}`
+        });
+        setTimeout(() => setImportStatus(null), 5000);
+      } catch (err) {
+        setImportStatus({ type: 'error', message: err.message });
+        setTimeout(() => setImportStatus(null), 5000);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be selected again
+    event.target.value = '';
+  };
+
   return (
     <div className="cli-panel">
       <div className="cli-tabs">
@@ -109,12 +157,42 @@ export function CLIPanel({ serviceId }) {
             <div className="execute-sidebar">
               <div className="sidebar-header">
                 <h3>Test Suites</h3>
-                {savedTests.length > 0 && selectedTests.length > 0 && (
-                  <button className="run-selected-btn" onClick={runSelectedTests}>
-                    Run Selected ({selectedTests.length})
+                <div className="sidebar-header-actions">
+                  <button
+                    className="import-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Import test suites from JSON"
+                  >
+                    Import
                   </button>
-                )}
+                  {savedTests.length > 0 && (
+                    <button
+                      className="export-btn"
+                      onClick={handleExport}
+                      title="Export test suites as JSON"
+                    >
+                      Export
+                    </button>
+                  )}
+                  {savedTests.length > 0 && selectedTests.length > 0 && (
+                    <button className="run-selected-btn" onClick={runSelectedTests}>
+                      Run Selected ({selectedTests.length})
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImport}
+                  accept=".json"
+                  style={{ display: 'none' }}
+                />
               </div>
+              {importStatus && (
+                <div className={`import-status ${importStatus.type}`}>
+                  {importStatus.message}
+                </div>
+              )}
 
               {savedTests.length === 0 ? (
                 <div className="empty-suites">
@@ -217,6 +295,7 @@ export function CLIPanel({ serviceId }) {
         {activeTab === 'create' && (
           <div className="create-view">
             <WorkflowBuilder
+              serviceId={serviceId}
               onSave={loadSavedTests}
               onSaveComplete={() => {
                 setActiveTab('execute');

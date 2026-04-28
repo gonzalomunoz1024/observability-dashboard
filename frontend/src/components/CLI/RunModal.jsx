@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { uploadExecutable, runWorkflowWithProgress } from '../../utils/cli';
+import { useState, useRef, useEffect } from 'react';
+import { uploadExecutable, runWorkflowStreaming } from '../../utils/cli';
 import { formatWorkflowForExecution } from '../../utils/workflowFormatter';
 import { cleanCliOutput } from '../../utils/outputCleaner';
 import './RunModal.css';
@@ -20,11 +20,54 @@ export function RunModal({ tests = [], onClose, onResult }) {
   const [completedConfigs, setCompletedConfigs] = useState([]);
   const [statusMessage, setStatusMessage] = useState('');
 
+  // Elapsed time tracking for running steps
+  const [stepStartTimes, setStepStartTimes] = useState({}); // { `${configId}-${stepId}`: timestamp }
+  const [elapsedTick, setElapsedTick] = useState(0); // Force re-render for elapsed time
+  const timerRef = useRef(null);
+
+  // Live output tracking per step
+  const [liveOutput, setLiveOutput] = useState({}); // { `${configId}-${stepId}`: { stdout: '', stderr: '' } }
+  const outputRefs = useRef({}); // Refs for auto-scrolling
+
+  // Start/stop elapsed time ticker when running
+  useEffect(() => {
+    if (isRunning) {
+      timerRef.current = setInterval(() => {
+        setElapsedTick(t => t + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isRunning]);
+
+  // Helper to format elapsed time
+  const formatElapsed = (startTime) => {
+    if (!startTime) return '';
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
+
   const testNames = tests.map(t => t.name);
 
   // Get all workflow variables from the first test (they should be the same)
   const workflowVariables = tests[0]?.variables || [];
   const hasVariables = workflowVariables.length > 0;
+
+  // Get unique variable identifier (handles empty or duplicate names)
+  const getVarId = (v, index) => v.name || `var-${index}`;
 
   // Initialize configurations when modal opens
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -32,8 +75,9 @@ export function RunModal({ tests = [], onClose, onResult }) {
     if (configurations.length === 0 && tests.length > 0) {
       const configId = `config-${Date.now()}`;
       const defaultVars = {};
-      workflowVariables.forEach(v => {
-        if (v.name) defaultVars[v.name] = v.defaultValue || '';
+      workflowVariables.forEach((v, index) => {
+        const varId = getVarId(v, index);
+        defaultVars[varId] = v.defaultValue || '';
       });
       setConfigurations([{
         id: configId,
@@ -59,8 +103,9 @@ export function RunModal({ tests = [], onClose, onResult }) {
       const sourceConfig = configurations.find(c => c.id === cloneFrom);
       newVars = { ...sourceConfig?.variables };
     } else {
-      workflowVariables.forEach(v => {
-        if (v.name) newVars[v.name] = v.defaultValue || '';
+      workflowVariables.forEach((v, index) => {
+        const varId = getVarId(v, index);
+        newVars[varId] = v.defaultValue || '';
       });
     }
 
@@ -142,14 +187,31 @@ export function RunModal({ tests = [], onClose, onResult }) {
     }
   };
 
-  // Run a single configuration
+  // Run a single configuration with streaming output
   const runConfiguration = async (config, test, executablePath) => {
     const configId = config.id;
+    const firstStepId = test.steps[0]?.id;
 
     // Initialize progress for this config
     const initialStepProgress = {};
     test.steps.forEach((step, idx) => {
       initialStepProgress[step.id] = idx === 0 ? 'running' : 'pending';
+    });
+
+    // Track start time for the first step
+    if (firstStepId) {
+      setStepStartTimes(prev => ({
+        ...prev,
+        [`${configId}-${firstStepId}`]: Date.now()
+      }));
+    }
+
+    // Initialize live output for all steps
+    test.steps.forEach(step => {
+      setLiveOutput(prev => ({
+        ...prev,
+        [`${configId}-${step.id}`]: { stdout: '', stderr: '' }
+      }));
     });
 
     setConfigProgress(prev => ({
@@ -158,7 +220,8 @@ export function RunModal({ tests = [], onClose, onResult }) {
         status: 'running',
         stepProgress: initialStepProgress,
         stepResults: {},
-        expandedSteps: {}
+        expandedSteps: { [firstStepId]: true }, // Auto-expand first step to show output
+        currentStepId: firstStepId
       }
     }));
 
@@ -167,18 +230,46 @@ export function RunModal({ tests = [], onClose, onResult }) {
       const formatted = formatWorkflowForExecution(test, executablePath, config.variables);
       console.log(`Running config ${config.name}:`, formatted);
 
-      const result = await runWorkflowWithProgress(
-        formatted,
-        (stepId) => {
+      let finalResult = null;
+
+      await runWorkflowStreaming(formatted, {
+        onStart: (data) => {
+          console.log('Workflow started:', data);
+        },
+
+        onStepStart: (stepId, data) => {
+          // Track start time for this step
+          setStepStartTimes(prev => ({
+            ...prev,
+            [`${configId}-${stepId}`]: Date.now()
+          }));
+
           setConfigProgress(prev => ({
             ...prev,
             [configId]: {
               ...prev[configId],
-              stepProgress: { ...prev[configId]?.stepProgress, [stepId]: 'running' }
+              stepProgress: { ...prev[configId]?.stepProgress, [stepId]: 'running' },
+              expandedSteps: { ...prev[configId]?.expandedSteps, [stepId]: true },
+              currentStepId: stepId
             }
           }));
         },
-        (stepId, stepResult) => {
+
+        onOutput: (stepId, output) => {
+          // Append live output
+          setLiveOutput(prev => {
+            const key = `${configId}-${stepId}`;
+            const current = prev[key] || { stdout: '', stderr: '' };
+            if (output.type === 'stdout') {
+              return { ...prev, [key]: { ...current, stdout: current.stdout + output.data } };
+            } else if (output.type === 'stderr') {
+              return { ...prev, [key]: { ...current, stderr: current.stderr + output.data } };
+            }
+            return prev;
+          });
+        },
+
+        onStepComplete: (stepId, stepResult) => {
           const passed = stepResult?.passed;
           setConfigProgress(prev => ({
             ...prev,
@@ -186,52 +277,45 @@ export function RunModal({ tests = [], onClose, onResult }) {
               ...prev[configId],
               stepProgress: { ...prev[configId]?.stepProgress, [stepId]: passed ? 'passed' : 'failed' },
               stepResults: { ...prev[configId]?.stepResults, [stepId]: stepResult },
-              expandedSteps: !passed ? { ...prev[configId]?.expandedSteps, [stepId]: true } : prev[configId]?.expandedSteps
+              expandedSteps: !passed
+                ? { ...prev[configId]?.expandedSteps, [stepId]: true }
+                : prev[configId]?.expandedSteps
             }
           }));
         },
-        (stepId, error) => {
+
+        onComplete: (result) => {
+          finalResult = result;
+          const allPassed = result?.passed ?? false;
+
           setConfigProgress(prev => ({
             ...prev,
             [configId]: {
               ...prev[configId],
-              stepProgress: { ...prev[configId]?.stepProgress, [stepId]: 'failed' },
-              stepResults: { ...prev[configId]?.stepResults, [stepId]: { passed: false, error } },
-              expandedSteps: { ...prev[configId]?.expandedSteps, [stepId]: true }
+              status: allPassed ? 'passed' : 'failed',
+              result
+            }
+          }));
+
+          // Pass result back to parent for Execution History
+          if (onResult) {
+            onResult(test, result, executablePath, config);
+          }
+        },
+
+        onError: (errorMessage) => {
+          setConfigProgress(prev => ({
+            ...prev,
+            [configId]: {
+              ...prev[configId],
+              status: 'failed',
+              error: errorMessage
             }
           }));
         }
-      );
-
-      const resultSteps = result?.steps || result?.results || [];
-      const allPassed = result?.passed ?? resultSteps.every(s => s.passed);
-
-      // Update final step results
-      const finalStepProgress = {};
-      const finalStepResults = {};
-      resultSteps.forEach(stepResult => {
-        const passed = stepResult.passed ?? (stepResult.validation?.passed ?? false);
-        finalStepProgress[stepResult.id] = passed ? 'passed' : 'failed';
-        finalStepResults[stepResult.id] = stepResult;
       });
 
-      setConfigProgress(prev => ({
-        ...prev,
-        [configId]: {
-          ...prev[configId],
-          status: allPassed ? 'passed' : 'failed',
-          stepProgress: { ...prev[configId]?.stepProgress, ...finalStepProgress },
-          stepResults: { ...prev[configId]?.stepResults, ...finalStepResults },
-          result
-        }
-      }));
-
-      // Pass result back to parent for Execution History
-      if (onResult) {
-        onResult(test, result, executablePath, config);
-      }
-
-      return { config, result, passed: allPassed };
+      return { config, result: finalResult, passed: finalResult?.passed ?? false };
     } catch (err) {
       setConfigProgress(prev => ({
         ...prev,
@@ -255,8 +339,9 @@ export function RunModal({ tests = [], onClose, onResult }) {
     let configsToRun = configurations;
     if (configsToRun.length === 0) {
       const defaultVars = {};
-      workflowVariables.forEach(v => {
-        if (v.name) defaultVars[v.name] = v.defaultValue || '';
+      workflowVariables.forEach((v, index) => {
+        const varId = getVarId(v, index);
+        defaultVars[varId] = v.defaultValue || '';
       });
       configsToRun = [{
         id: `config-${Date.now()}`,
@@ -542,20 +627,23 @@ export function RunModal({ tests = [], onClose, onResult }) {
 
                       {expandedConfigs[config.id] && (
                         <div className="config-variables">
-                          {workflowVariables.map(v => (
-                            <div key={v.name} className="config-var-row">
-                              <label className="config-var-label" title={v.description}>
-                                {v.name}:
-                              </label>
-                              <input
-                                type="text"
-                                className="config-var-input"
-                                value={config.variables[v.name] || ''}
-                                onChange={(e) => updateConfigVariable(config.id, v.name, e.target.value)}
-                                placeholder={v.defaultValue || ''}
-                              />
-                            </div>
-                          ))}
+                          {workflowVariables.map((v, varIndex) => {
+                            const varId = getVarId(v, varIndex);
+                            return (
+                              <div key={varIndex} className="config-var-row">
+                                <label className="config-var-label" title={v.description}>
+                                  {v.name || `Variable ${varIndex + 1}`}:
+                                </label>
+                                <input
+                                  type="text"
+                                  className="config-var-input"
+                                  value={config.variables[varId] || ''}
+                                  onChange={(e) => updateConfigVariable(config.id, varId, e.target.value)}
+                                  placeholder={v.defaultValue || ''}
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -638,25 +726,84 @@ export function RunModal({ tests = [], onClose, onResult }) {
                           const result = stepResults[step.id];
                           const isStepExpanded = configExpandedSteps[step.id];
                           const hasResult = result && (status === 'passed' || status === 'failed');
+                          const stepStartTime = stepStartTimes[`${config.id}-${step.id}`];
+                          const elapsedSeconds = stepStartTime ? Math.floor((Date.now() - stepStartTime) / 1000) : 0;
+                          const isLongRunning = status === 'running' && elapsedSeconds > 30;
+                          const maybeWaitingForInput = status === 'running' && elapsedSeconds > 60 && step.type !== 'http';
 
                           return (
                             <div key={step.id} className={`progress-step ${status}`}>
                               <div
-                                className={`step-row ${hasResult ? 'clickable' : ''}`}
-                                onClick={() => hasResult && toggleConfigStepExpand(config.id, step.id)}
+                                className={`step-row ${hasResult || status === 'running' ? 'clickable' : ''}`}
+                                onClick={() => (hasResult || status === 'running') && toggleConfigStepExpand(config.id, step.id)}
                               >
                                 {getStepIcon(status)}
                                 <span className="step-name">{step.name || step.id}</span>
                                 {status === 'running' && (
-                                  <span className="step-spinner"></span>
+                                  <>
+                                    <span className="step-spinner"></span>
+                                    <span className={`step-elapsed ${isLongRunning ? 'warning' : ''}`}>
+                                      {formatElapsed(stepStartTime)}
+                                    </span>
+                                  </>
                                 )}
                                 {result?.duration && (
                                   <span className="step-duration">{result.duration}ms</span>
                                 )}
-                                {hasResult && (
+                                {(hasResult || status === 'running') && (
                                   <span className="expand-icon">{isStepExpanded ? '▼' : '▶'}</span>
                                 )}
                               </div>
+
+                              {/* Show command being executed for running steps */}
+                              {status === 'running' && step.type !== 'http' && step.args && (
+                                <div className="running-command">
+                                  <code>{step.args}</code>
+                                </div>
+                              )}
+                              {status === 'running' && step.type === 'http' && step.http?.url && (
+                                <div className="running-command">
+                                  <code>{step.http.method || 'GET'} {step.http.url}</code>
+                                </div>
+                              )}
+
+                              {/* Live output display for running steps */}
+                              {status === 'running' && isStepExpanded && (() => {
+                                const output = liveOutput[`${config.id}-${step.id}`];
+                                const hasOutput = output?.stdout || output?.stderr;
+                                return (
+                                  <div className="live-output">
+                                    {hasOutput ? (
+                                      <>
+                                        {output.stdout && (
+                                          <div className="live-output-section">
+                                            <span className="live-output-label">stdout:</span>
+                                            <pre className="live-output-content">{output.stdout}</pre>
+                                          </div>
+                                        )}
+                                        {output.stderr && (
+                                          <div className="live-output-section stderr">
+                                            <span className="live-output-label">stderr:</span>
+                                            <pre className="live-output-content">{output.stderr}</pre>
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <div className="live-output-section">
+                                        <span className="live-output-waiting">Waiting for output...</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Warning for potentially stuck process */}
+                              {maybeWaitingForInput && (
+                                <div className="step-warning">
+                                  <span className="warning-icon">&#9888;</span>
+                                  <span>Taking longer than expected. Process may be waiting for stdin input, hanging, or performing a long operation.</span>
+                                </div>
+                              )}
 
                               {status === 'failed' && result && !isStepExpanded && (
                                 <div className="failure-summary">

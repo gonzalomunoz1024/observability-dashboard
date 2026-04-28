@@ -32,7 +32,7 @@ const defaultStep = {
   },
 };
 
-export function WorkflowBuilder({ onSave: onSaveCallback, onSaveComplete, initialWorkflow, onCancelEdit }) {
+export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveComplete, initialWorkflow, onCancelEdit }) {
   const [workflowId, setWorkflowId] = useState(null);
   const [workflowName, setWorkflowName] = useState('');
   const [variables, setVariables] = useState([]); // Global variables with defaults
@@ -47,8 +47,8 @@ export function WorkflowBuilder({ onSave: onSaveCallback, onSaveComplete, initia
   const [expandedStepIndex, setExpandedStepIndex] = useState(0);
 
   useEffect(() => {
-    setSavedWorkflows(getSavedWorkflows());
-  }, []);
+    setSavedWorkflows(getSavedWorkflows(serviceId));
+  }, [serviceId]);
 
   // Load initial workflow when provided (for editing)
   useEffect(() => {
@@ -74,9 +74,9 @@ export function WorkflowBuilder({ onSave: onSaveCallback, onSaveComplete, initia
       envVars,
       setupCommands,
       steps,
-    });
+    }, serviceId);
     setWorkflowId(saved.id);
-    setSavedWorkflows(getSavedWorkflows());
+    setSavedWorkflows(getSavedWorkflows(serviceId));
     setError(null);
     if (onSaveCallback) {
       onSaveCallback();
@@ -98,7 +98,7 @@ export function WorkflowBuilder({ onSave: onSaveCallback, onSaveComplete, initia
 
   const handleDelete = (id) => {
     deleteWorkflow(id);
-    setSavedWorkflows(getSavedWorkflows());
+    setSavedWorkflows(getSavedWorkflows(serviceId));
     if (workflowId === id) {
       setWorkflowId(null);
     }
@@ -307,13 +307,12 @@ export function WorkflowBuilder({ onSave: onSaveCallback, onSaveComplete, initia
                   }
                 });
 
+                // Compute global variables once (outside the map)
+                const globalVarNames = variables.filter(v => v.name).map(v => v.name);
+
                 return steps.map((step, index) => {
                   // Compute available variables from global variables + previous steps
-                  const availableVars = ['workDir']; // System variables
-                  // Add global variables
-                  variables.forEach(v => {
-                    if (v.name) availableVars.push(v.name);
-                  });
+                  const availableVars = ['workDir', ...globalVarNames]; // System + global variables
                   for (let i = 0; i < index; i++) {
                     const prevStep = steps[i];
                     if (Array.isArray(prevStep.capture)) {
@@ -334,7 +333,7 @@ export function WorkflowBuilder({ onSave: onSaveCallback, onSaveComplete, initia
                   }
                   return (
                     <StepConfig
-                      key={index}
+                      key={`${step.id || index}-${globalVarNames.join(',')}`}
                       step={step}
                       index={index}
                       previousStepIds={steps.slice(0, index).map((s) => s.id)}
