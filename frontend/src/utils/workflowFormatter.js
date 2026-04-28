@@ -271,13 +271,15 @@ function buildExpectations(expectations) {
 function parseCapture(captureArr) {
   if (!Array.isArray(captureArr) || captureArr.length === 0) return undefined;
   try {
-    const result = {};
-    captureArr.forEach((item) => {
-      if (item.varName && item.regex) {
-        result[item.varName] = { source: item.source || 'stdout', regex: item.regex };
-      }
-    });
-    return Object.keys(result).length > 0 ? result : undefined;
+    // Return as array - server expects step.capture.forEach()
+    const result = captureArr
+      .filter(item => item.varName && item.regex)
+      .map(item => ({
+        varName: item.varName,
+        regex: item.regex,
+        source: item.source || 'stdout'
+      }));
+    return result.length > 0 ? result : undefined;
   } catch {
     return undefined;
   }
