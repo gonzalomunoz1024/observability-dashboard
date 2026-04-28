@@ -16,6 +16,8 @@
   padding: var(--space-6);
   width: 100%;
   max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
   animation: slideUp 0.2s ease-out;
 }
 
