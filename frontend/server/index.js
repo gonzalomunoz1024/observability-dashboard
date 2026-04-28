@@ -92,9 +92,30 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
     onOutput({ type: 'stdout', data: `[DEBUG] Working dir: ${workDir}\n` });
     onOutput({ type: 'stdout', data: `[INFO] Running: ${executablePath} ${args}\n` });
 
+    console.log('[runCommandStep] Spawning process...');
     const proc = spawn(executablePath, argsArray, {
       cwd: workDir,
       env: { ...process.env, ...parseEnvVars(step.envVars) }
+    });
+    console.log('[runCommandStep] Process spawned, PID:', proc.pid);
+
+    // Handle spawn errors (e.g., executable not found)
+    proc.on('error', (err) => {
+      console.error('[runCommandStep] Spawn error:', err.message);
+      if (!resolved) {
+        resolved = true;
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        if (streamId) activeProcesses.delete(streamId);
+        onOutput({ type: 'stderr', data: `[ERROR] Failed to start process: ${err.message}\n` });
+        resolve({
+          passed: false,
+          exitCode: -1,
+          stdout: '',
+          stderr: err.message,
+          duration: Date.now() - startTime,
+          validations: [{ name: 'process_start', passed: false, message: `Failed to start: ${err.message}` }]
+        });
+      }
     });
 
     // Track process for cancellation
@@ -154,6 +175,7 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
 
     proc.stdout.on('data', (data) => {
       const text = data.toString();
+      console.log('[runCommandStep] stdout:', text.substring(0, 100).replace(/\n/g, '\\n') + (text.length > 100 ? '...' : ''));
       stdout += text;
       onOutput({ type: 'stdout', data: text });
       lastStdoutTime = Date.now();
@@ -172,11 +194,13 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
 
     proc.stderr.on('data', (data) => {
       const text = data.toString();
+      console.log('[runCommandStep] stderr:', text.substring(0, 100).replace(/\n/g, '\\n') + (text.length > 100 ? '...' : ''));
       stderr += text;
       onOutput({ type: 'stderr', data: text });
     });
 
     proc.on('close', (code, signal) => {
+      console.log('[runCommandStep] Process closed, code:', code, 'signal:', signal);
       if (resolved) return;
       resolved = true;
       if (timeoutHandle) clearTimeout(timeoutHandle);
