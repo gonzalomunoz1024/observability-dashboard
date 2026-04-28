@@ -34,10 +34,26 @@ export function saveWorkflow(workflow, serviceId = null) {
   return workflowWithMeta;
 }
 
-export function deleteWorkflow(id) {
+export function deleteWorkflow(id, alsoDeleteHistory = true) {
   const workflows = getSavedWorkflows();
+  const workflowToDelete = workflows.find((w) => w.id === id);
   const filtered = workflows.filter((w) => w.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+
+  // Also delete associated execution history
+  if (alsoDeleteHistory && workflowToDelete) {
+    deleteExecutionHistoryForWorkflow(workflowToDelete.name, workflowToDelete.serviceId);
+  }
+}
+
+export function deleteWorkflowsForService(serviceId) {
+  // Delete all workflows for this service
+  const workflows = getSavedWorkflows();
+  const filtered = workflows.filter((w) => w.serviceId !== serviceId);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+
+  // Delete all execution history for this service
+  clearExecutionHistory(serviceId);
 }
 
 export function getWorkflowById(id) {
@@ -84,6 +100,12 @@ export function clearExecutionHistory(serviceId = null) {
   } else {
     localStorage.setItem(HISTORY_KEY, JSON.stringify([]));
   }
+}
+
+export function deleteExecutionHistoryForWorkflow(workflowName, serviceId) {
+  const history = getExecutionHistory();
+  const filtered = history.filter(h => !(h.workflowName === workflowName && h.serviceId === serviceId));
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
 }
 
 // Export workflows as JSON collection

@@ -195,8 +195,10 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                   </label>
                   <input
                     type="number"
-                    value={step.timeout}
-                    onChange={(e) => handleChange('timeout', parseInt(e.target.value) || 30000)}
+                    value={step.timeout ?? ''}
+                    onChange={(e) => handleChange('timeout', e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                    onBlur={(e) => e.target.value === '' && handleChange('timeout', 30000)}
+                    placeholder="30000"
                   />
                 </div>
               </div>
@@ -225,8 +227,10 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                   </label>
                   <input
                     type="number"
-                    value={step.stdinDelay}
-                    onChange={(e) => handleChange('stdinDelay', parseInt(e.target.value) || 100)}
+                    value={step.stdinDelay ?? ''}
+                    onChange={(e) => handleChange('stdinDelay', e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                    onBlur={(e) => e.target.value === '' && handleChange('stdinDelay', 100)}
+                    placeholder="100"
                   />
                 </div>
               </div>
@@ -772,11 +776,16 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                     </label>
                     <input
                       type="number"
-                      value={step.http?.polling?.intervalSeconds || 30}
+                      value={step.http?.polling?.intervalSeconds ?? ''}
                       onChange={(e) => handleHttpChange('polling', {
                         ...step.http?.polling,
-                        intervalSeconds: parseInt(e.target.value) || 30,
+                        intervalSeconds: e.target.value === '' ? '' : parseInt(e.target.value, 10),
                       })}
+                      onBlur={(e) => e.target.value === '' && handleHttpChange('polling', {
+                        ...step.http?.polling,
+                        intervalSeconds: 30,
+                      })}
+                      placeholder="30"
                     />
                   </div>
                   <div className="form-group">
@@ -786,11 +795,16 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                     </label>
                     <input
                       type="number"
-                      value={step.http?.polling?.maxDurationMinutes || 60}
+                      value={step.http?.polling?.maxDurationMinutes ?? ''}
                       onChange={(e) => handleHttpChange('polling', {
                         ...step.http?.polling,
-                        maxDurationMinutes: parseInt(e.target.value) || 60,
+                        maxDurationMinutes: e.target.value === '' ? '' : parseInt(e.target.value, 10),
                       })}
+                      onBlur={(e) => e.target.value === '' && handleHttpChange('polling', {
+                        ...step.http?.polling,
+                        maxDurationMinutes: 60,
+                      })}
+                      placeholder="60"
                     />
                   </div>
                 </div>
@@ -809,11 +823,16 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                   </label>
                   <input
                     type="number"
-                    value={step.http?.expect?.statusCode || 200}
+                    value={step.http?.expect?.statusCode ?? ''}
                     onChange={(e) => handleHttpChange('expect', {
                       ...step.http?.expect,
-                      statusCode: parseInt(e.target.value) || 200,
+                      statusCode: e.target.value === '' ? '' : parseInt(e.target.value, 10),
                     })}
+                    onBlur={(e) => e.target.value === '' && handleHttpChange('expect', {
+                      ...step.http?.expect,
+                      statusCode: 200,
+                    })}
+                    placeholder="200"
                   />
                 </div>
               </div>

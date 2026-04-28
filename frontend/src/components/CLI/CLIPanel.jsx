@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { WorkflowBuilder } from './WorkflowBuilder';
 import { RunModal } from './RunModal';
 import { CLIResults } from './CLIResults';
-import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory, exportWorkflows, importWorkflows } from '../../utils/workflowStorage';
+import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory, exportWorkflows, importWorkflows, deleteWorkflow } from '../../utils/workflowStorage';
 import './CLIPanel.css';
 
 export function CLIPanel({ serviceId }) {
@@ -94,6 +94,17 @@ export function CLIPanel({ serviceId }) {
     const testsToExecute = savedTests.filter(t => selectedTests.includes(t.id));
     if (testsToExecute.length > 0) {
       setTestsToRun(testsToExecute);
+    }
+  };
+
+  const handleDeleteTest = (test) => {
+    if (window.confirm(`Delete "${test.name}"? This will also delete all execution history for this test suite.`)) {
+      deleteWorkflow(test.id);
+      loadSavedTests();
+      // Refresh results to reflect deleted history
+      setResults(getExecutionHistory(serviceId));
+      // Remove from selection if selected
+      setSelectedTests(prev => prev.filter(id => id !== test.id));
     }
   };
 
@@ -242,6 +253,13 @@ export function CLIPanel({ serviceId }) {
                             disabled={isRunning === test.id}
                           >
                             {isRunning === test.id ? '...' : 'Run'}
+                          </button>
+                          <button
+                            className="delete-btn"
+                            onClick={() => handleDeleteTest(test)}
+                            title="Delete test suite"
+                          >
+                            Delete
                           </button>
                         </div>
                       </div>

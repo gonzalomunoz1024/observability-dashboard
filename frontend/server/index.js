@@ -96,12 +96,19 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
 
     // Handle stdin inputs if configured
     if (step.stdinInputs) {
-      const inputs = step.stdinInputs.split('\n');
+      // Interpolate variables in stdin inputs
+      const interpolatedInputs = interpolateVariables(step.stdinInputs, variables);
+      const inputs = interpolatedInputs.split('\n').filter(line => line !== '');
       let inputIndex = 0;
+
+      onOutput({ type: 'info', message: `Sending ${inputs.length} stdin input(s)` });
+
       const sendInput = () => {
         if (inputIndex < inputs.length) {
           setTimeout(() => {
-            proc.stdin.write(inputs[inputIndex] + '\n');
+            const input = inputs[inputIndex];
+            onOutput({ type: 'stdin', data: `> ${input}` });
+            proc.stdin.write(input + '\n');
             inputIndex++;
             sendInput();
           }, step.stdinDelay || 100);
