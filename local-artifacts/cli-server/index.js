@@ -375,9 +375,8 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
         streamId
       );
 
-      results.push(result);
-
-      // Capture variables from output
+      // Capture variables from output and include in result
+      const stepCaptures = {};
       if (step.capture) {
         step.capture.forEach(cap => {
           if (cap.varName && cap.regex) {
@@ -385,6 +384,7 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
               const match = result.stdout.match(new RegExp(cap.regex));
               if (match && match[1]) {
                 variables[cap.varName] = match[1];
+                stepCaptures[cap.varName] = match[1];
                 sendEvent('capture', { stepId: step.id, varName: cap.varName, value: match[1] });
               }
             } catch (e) {
@@ -393,6 +393,13 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
           }
         });
       }
+
+      // Include captures in the result
+      if (Object.keys(stepCaptures).length > 0) {
+        result.captures = stepCaptures;
+      }
+
+      results.push(result);
 
       sendEvent('stepComplete', { stepId: step.id, result });
 
