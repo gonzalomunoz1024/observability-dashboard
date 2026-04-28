@@ -1060,3 +1060,42 @@
   color: var(--color-fg-quaternary);
   font-style: italic;
 }
+
+/* Captured Variables */
+.captured-vars-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.captured-var-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: rgba(52, 199, 89, 0.08);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-success);
+}
+
+.captured-var-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-success);
+  font-family: var(--font-family-mono);
+}
+
+.captured-var-equals {
+  color: var(--color-fg-quaternary);
+}
+
+.captured-var-value {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-primary);
+  font-family: var(--font-family-mono);
+  background: var(--color-bg-primary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+}

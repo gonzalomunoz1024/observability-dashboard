@@ -28,6 +28,7 @@ export function RunModal({ tests = [], onClose, onResult }) {
 
   // Live output tracking per step
   const [liveOutput, setLiveOutput] = useState({}); // { `${configId}-${stepId}`: { stdout: '', stderr: '' } }
+  const [capturedVars, setCapturedVars] = useState({}); // { `${configId}-${stepId}`: { varName: value, ... } }
   const outputRefs = useRef({}); // Refs for auto-scrolling
 
   // Start/stop elapsed time ticker when running
@@ -290,6 +291,16 @@ export function RunModal({ tests = [], onClose, onResult }) {
           }));
         },
 
+        onCapture: (varName, value, stepId) => {
+          setCapturedVars(prev => {
+            const key = `${configId}-${stepId}`;
+            return {
+              ...prev,
+              [key]: { ...(prev[key] || {}), [varName]: value }
+            };
+          });
+        },
+
         onComplete: (result) => {
           finalResult = result;
           const allPassed = result?.passed ?? false;
@@ -441,7 +452,7 @@ export function RunModal({ tests = [], onClose, onResult }) {
   };
 
   // Render step details (matching CLIResults format exactly)
-  const renderStepDetails = (step, result) => {
+  const renderStepDetails = (step, result, stepCaptures = {}) => {
     if (!result) return null;
 
     // Debug: log the actual result structure to see where stdout is
@@ -561,6 +572,22 @@ export function RunModal({ tests = [], onClose, onResult }) {
                       got: {JSON.stringify(v.actual)}
                     </span>
                   )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Captured Variables */}
+        {Object.keys(stepCaptures).length > 0 && (
+          <div className="detail-section">
+            <h5>Captured Variables</h5>
+            <div className="captured-vars-list">
+              {Object.entries(stepCaptures).map(([varName, value]) => (
+                <div key={varName} className="captured-var-item">
+                  <span className="captured-var-name">{varName}</span>
+                  <span className="captured-var-equals">=</span>
+                  <code className="captured-var-value">{value}</code>
                 </div>
               ))}
             </div>
@@ -834,7 +861,7 @@ export function RunModal({ tests = [], onClose, onResult }) {
                                 </div>
                               )}
 
-                              {isStepExpanded && renderStepDetails(step, result)}
+                              {isStepExpanded && renderStepDetails(step, result, capturedVars[`${config.id}-${step.id}`] || {})}
                             </div>
                           );
                         })}

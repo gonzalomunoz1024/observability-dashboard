@@ -94,7 +94,7 @@ export async function runWorkflowWithProgress(workflow, onStepStart, onStepCompl
 
 // Workflow execution with SSE streaming for live output
 export function runWorkflowStreaming(workflow, callbacks) {
-  const { onStart, onStepStart, onOutput, onStepComplete, onComplete, onError, onStreamId } = callbacks;
+  const { onStart, onStepStart, onOutput, onStepComplete, onComplete, onError, onStreamId, onCapture } = callbacks;
 
   return new Promise((resolve, reject) => {
     fetch(`${PROXY_URL}/api/cli/workflow/stream`, {
@@ -150,6 +150,9 @@ export function runWorkflowStreaming(workflow, callbacks) {
                       break;
                     case 'stepComplete':
                       onStepComplete?.(data.stepId, data.result);
+                      break;
+                    case 'capture':
+                      onCapture?.(data.varName, data.value, data.stepId);
                       break;
                     case 'complete':
                       onComplete?.(data);

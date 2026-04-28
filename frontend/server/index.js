@@ -385,7 +385,7 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
               const match = result.stdout.match(new RegExp(cap.regex));
               if (match && match[1]) {
                 variables[cap.varName] = match[1];
-                sendEvent('capture', { varName: cap.varName, value: match[1] });
+                sendEvent('capture', { stepId: step.id, varName: cap.varName, value: match[1] });
               }
             } catch (e) {
               console.warn('Capture regex error:', e.message);
