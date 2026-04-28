@@ -12,9 +12,10 @@ export function RunModal({ tests = [], onClose, onResult }) {
   const fileInputRef = useRef(null);
   const [activeStreamIds, setActiveStreamIds] = useState({}); // configId -> streamId
 
-  // Configurations for parallel runs with different variable values
+  // Configurations for runs with different variable values
   const [configurations, setConfigurations] = useState([]);
   const [expandedConfigs, setExpandedConfigs] = useState({});
+  const [executionMode, setExecutionMode] = useState('parallel'); // 'parallel' or 'sequential'
 
   // Progress tracking per configuration
   const [configProgress, setConfigProgress] = useState({}); // { configId: { stepProgress: {}, stepResults: {}, status: 'pending'|'running'|'passed'|'failed' } }
@@ -116,7 +117,8 @@ export function RunModal({ tests = [], onClose, onResult }) {
       name: `Run ${configurations.length + 1}`,
       variables: newVars
     }]);
-    setExpandedConfigs(prev => ({ ...prev, [newId]: true }));
+    // Accordion behavior: collapse all others, expand only the new one
+    setExpandedConfigs({ [newId]: true });
   };
 
   const removeConfiguration = (configId) => {
@@ -361,13 +363,25 @@ export function RunModal({ tests = [], onClose, onResult }) {
       const uploadResult = await uploadExecutable(executableFile);
       setStatusMessage(`Running ${configsToRun.length} configuration${configsToRun.length > 1 ? 's' : ''}...`);
 
-      // Run all configurations in parallel for each test
+      // Run all configurations for each test
       const test = tests[0]; // For now, assume single test with multiple configs
 
-      // Execute all configurations in parallel
-      const results = await Promise.all(
-        configsToRun.map(config => runConfiguration(config, test, uploadResult.path))
-      );
+      let results;
+      if (executionMode === 'sequential') {
+        // Execute configurations one after another
+        results = [];
+        for (const config of configsToRun) {
+          const result = await runConfiguration(config, test, uploadResult.path);
+          results.push(result);
+          // Update status message with progress
+          setStatusMessage(`Running configuration ${results.length}/${configsToRun.length}...`);
+        }
+      } else {
+        // Execute all configurations in parallel
+        results = await Promise.all(
+          configsToRun.map(config => runConfiguration(config, test, uploadResult.path))
+        );
+      }
 
       setCompletedConfigs(results);
       setStatusMessage('Complete');
@@ -479,8 +493,36 @@ export function RunModal({ tests = [], onClose, onResult }) {
               <div className="configurations-section">
                 <div className="configurations-header">
                   <label>Configurations</label>
+                </div>
+
+                {/* Execution Mode Selector */}
+                {configurations.length > 1 && (
+                  <div className="execution-mode-selector">
+                    <div className="segmented-control">
+                      <button
+                        className={`segment ${executionMode === 'parallel' ? 'active' : ''}`}
+                        onClick={() => setExecutionMode('parallel')}
+                      >
+                        Parallel
+                      </button>
+                      <button
+                        className={`segment ${executionMode === 'sequential' ? 'active' : ''}`}
+                        onClick={() => setExecutionMode('sequential')}
+                      >
+                        Sequential
+                      </button>
+                    </div>
+                    <span className="execution-mode-hint">
+                      {executionMode === 'parallel'
+                        ? 'All configurations run simultaneously'
+                        : 'Configurations run one after another'}
+                    </span>
+                  </div>
+                )}
+
+                <div className="configurations-list-header">
                   <button className="add-config-btn" onClick={() => addConfiguration()}>
-                    + Add
+                    + Add Configuration
                   </button>
                 </div>
 
