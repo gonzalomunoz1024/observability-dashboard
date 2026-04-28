@@ -40,6 +40,25 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Running indicator - replaces the dot with a spinner */
+.status-dot.running {
+  background: transparent;
+}
+
+.running-indicator {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid rgba(0, 122, 255, 0.25);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* CLI Indicator */
@@ -98,6 +117,11 @@
 .service-item.collapsed .status-dot {
   width: 10px;
   height: 10px;
+}
+
+.service-item.collapsed .running-indicator {
+  inset: 0;
+  border-width: 2px;
 }
 
 .service-item.collapsed .cli-indicator {

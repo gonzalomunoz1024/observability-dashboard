@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { WorkflowBuilder } from './WorkflowBuilder';
 import { RunModal } from './RunModal';
 import { CLIResults } from './CLIResults';
+import { RunningJobCard } from './RunningJobCard';
+import { useServiceJobs, useBackgroundJobs } from '../../context/BackgroundJobsContext';
 import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory, exportWorkflows, importWorkflows, deleteWorkflow } from '../../utils/workflowStorage';
 import './CLIPanel.css';
 
@@ -13,17 +15,26 @@ export function CLIPanel({ serviceId }) {
     return tests.length === 0 ? 'create' : 'execute';
   });
   const [results, setResults] = useState(() => getExecutionHistory(serviceId));
-  const [error, setError] = useState(null);
-  const [isRunning, setIsRunning] = useState(null);
+  const [error] = useState(null);
+  const [isRunning] = useState(null);
   const [testsToRun, setTestsToRun] = useState([]); // Changed to array
   const [selectedTests, setSelectedTests] = useState([]); // For multi-select
   const [workflowToEdit, setWorkflowToEdit] = useState(null);
   const [importStatus, setImportStatus] = useState(null); // { type: 'success' | 'error', message: string }
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    loadSavedTests();
-  }, [serviceId]);
+  // Background jobs for this service
+  const serviceJobs = useServiceJobs(serviceId);
+  const { cancelJob } = useBackgroundJobs();
+
+  // Combine running jobs with completed history
+  const allResults = useMemo(() => {
+    const runningJobs = Object.values(serviceJobs)
+      .filter(job => job.status === 'running' || job.status === 'interrupted')
+      .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+
+    return { runningJobs, completedResults: results };
+  }, [serviceJobs, results]);
 
   const loadSavedTests = () => {
     const tests = getSavedWorkflows(serviceId);
@@ -33,6 +44,11 @@ export function CLIPanel({ serviceId }) {
       setActiveTab('create');
     }
   };
+
+  useEffect(() => {
+    loadSavedTests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceId]);
 
   const clearResults = () => {
     clearExecutionHistory(serviceId);
@@ -272,7 +288,12 @@ export function CLIPanel({ serviceId }) {
 
             <div className="execute-main">
               <div className="results-header">
-                <h3>Execution History</h3>
+                <h3>
+                  Execution History
+                  {allResults.runningJobs.length > 0 && (
+                    <span className="running-count"> ({allResults.runningJobs.length} running)</span>
+                  )}
+                </h3>
                 {results.length > 0 && (
                   <button className="clear-btn" onClick={clearResults}>
                     Clear
@@ -282,7 +303,7 @@ export function CLIPanel({ serviceId }) {
 
               {error && <div className="panel-error">{error}</div>}
 
-              {results.length === 0 ? (
+              {allResults.runningJobs.length === 0 && results.length === 0 ? (
                 <div className="empty-results">
                   <div className="empty-icon">&#9654;</div>
                   <h4>No test runs yet</h4>
@@ -290,6 +311,16 @@ export function CLIPanel({ serviceId }) {
                 </div>
               ) : (
                 <div className="results-list">
+                  {/* Running background jobs */}
+                  {allResults.runningJobs.map((job) => (
+                    <RunningJobCard
+                      key={job.id}
+                      job={job}
+                      onCancel={cancelJob}
+                    />
+                  ))}
+
+                  {/* Completed results */}
                   {results.map((result, index) => (
                     <div key={index} className="result-card">
                       <div className="result-header">
@@ -332,6 +363,7 @@ export function CLIPanel({ serviceId }) {
       {testsToRun.length > 0 && (
         <RunModal
           tests={testsToRun}
+          serviceId={serviceId}
           onResult={handleTestResult}
           onClose={() => {
             setTestsToRun([]);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ServicesProvider } from './context/ServicesContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { BackgroundJobsProvider } from './context/BackgroundJobsContext';
 import { Sidebar } from './components/Navigation/Sidebar';
 import { GlobalDashboard } from './components/GlobalView/GlobalDashboard';
 import { ServiceView } from './components/ServiceView/ServiceView';
@@ -55,7 +56,9 @@ function App() {
   return (
     <ThemeProvider>
       <ServicesProvider>
-        <Dashboard />
+        <BackgroundJobsProvider>
+          <Dashboard />
+        </BackgroundJobsProvider>
       </ServicesProvider>
     </ThemeProvider>
   );

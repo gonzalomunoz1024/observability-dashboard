@@ -300,6 +300,155 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
   });
 }
 
+// Run a single HTTP step
+async function runHttpStep(step, variables, onOutput) {
+  const startTime = Date.now();
+  const http = step.http || {};
+
+  // Interpolate variables in URL, headers, body
+  const url = interpolateVariables(http.url, variables);
+  const method = (http.method || 'GET').toUpperCase();
+  const timeout = step.timeout || 30000;
+
+  // Parse headers
+  let headers = {};
+  if (http.headers && typeof http.headers === 'object') {
+    for (const [key, value] of Object.entries(http.headers)) {
+      headers[key] = interpolateVariables(value, variables);
+    }
+  }
+
+  // Parse body
+  let body = undefined;
+  if (http.body) {
+    body = interpolateVariables(http.body, variables);
+    if (!headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
+  }
+
+  console.log('[runHttpStep] Request:', method, url);
+  console.log('[runHttpStep] Headers:', headers);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    onOutput({ type: 'stdout', data: `${method} ${url}\n` });
+
+    const fetchOptions = {
+      method,
+      headers,
+      signal: controller.signal,
+    };
+    if (body && method !== 'GET') {
+      fetchOptions.body = body;
+    }
+
+    const response = await fetch(url, fetchOptions);
+    clearTimeout(timeoutId);
+
+    const responseText = await response.text();
+    const duration = Date.now() - startTime;
+
+    onOutput({ type: 'stdout', data: `Status: ${response.status}\n` });
+    onOutput({ type: 'stdout', data: `Response: ${responseText.substring(0, 500)}${responseText.length > 500 ? '...' : ''}\n` });
+
+    // Build validations
+    const validations = [];
+    const expect = http.expect || {};
+
+    // Status code validation
+    const expectedStatus = expect.statusCode || 200;
+    const statusPassed = response.status === expectedStatus;
+    validations.push({
+      type: 'statusCode',
+      expected: expectedStatus,
+      actual: response.status,
+      passed: statusPassed
+    });
+
+    // Body contains validation
+    if (expect.bodyContains) {
+      const bodyContainsPassed = responseText.includes(expect.bodyContains);
+      validations.push({
+        type: 'bodyContains',
+        expected: expect.bodyContains,
+        passed: bodyContainsPassed
+      });
+    }
+
+    // JSON path validation (simple implementation)
+    if (expect.jsonPath) {
+      try {
+        const json = JSON.parse(responseText);
+        // Simple jsonPath like "$.status" or "status"
+        const pathParts = expect.jsonPath.replace(/^\$\.?/, '').split('.');
+        let value = json;
+        for (const part of pathParts) {
+          value = value?.[part];
+        }
+        validations.push({
+          type: 'jsonPath',
+          path: expect.jsonPath,
+          value: value,
+          passed: value !== undefined
+        });
+      } catch (e) {
+        validations.push({
+          type: 'jsonPath',
+          path: expect.jsonPath,
+          error: 'Invalid JSON response',
+          passed: false
+        });
+      }
+    }
+
+    const allPassed = validations.every(v => v.passed);
+
+    return {
+      id: step.id,
+      name: step.name || step.id,
+      type: 'http',
+      url,
+      method,
+      statusCode: response.status,
+      stdout: responseText,
+      stderr: '',
+      duration,
+      passed: allPassed,
+      validations
+    };
+
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const duration = Date.now() - startTime;
+    const errorMessage = error.name === 'AbortError' ? 'Request timeout' : error.message;
+
+    onOutput({ type: 'stderr', data: `Error: ${errorMessage}\n` });
+
+    return {
+      id: step.id,
+      name: step.name || step.id,
+      type: 'http',
+      url,
+      method,
+      statusCode: null,
+      stdout: '',
+      stderr: errorMessage,
+      duration,
+      passed: false,
+      error: errorMessage,
+      validations: [{
+        type: 'request',
+        expected: 'successful request',
+        actual: errorMessage,
+        passed: false
+      }]
+    };
+  }
+}
+
 // Parse environment variables string
 function parseEnvVars(envVarsString) {
   if (!envVarsString) return {};
@@ -366,18 +515,29 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
     for (const step of steps) {
       sendEvent('stepStart', { stepId: step.id, name: step.name || step.id });
 
-      const result = await runCommandStep(
-        step,
-        executablePath,
-        workDir,
-        variables,
-        (output) => sendEvent('output', { stepId: step.id, ...output }),
-        streamId
-      );
+      let result;
+      if (step.type === 'http') {
+        // HTTP request step
+        result = await runHttpStep(
+          step,
+          variables,
+          (output) => sendEvent('output', { stepId: step.id, ...output })
+        );
+      } else {
+        // Command step
+        result = await runCommandStep(
+          step,
+          executablePath,
+          workDir,
+          variables,
+          (output) => sendEvent('output', { stepId: step.id, ...output }),
+          streamId
+        );
+      }
 
-      // Capture variables from output and include in result
+      // Capture variables from output and include in result (for command steps)
       const stepCaptures = {};
-      if (step.capture) {
+      if (step.capture && step.type !== 'http') {
         step.capture.forEach(cap => {
           if (cap.varName && cap.regex) {
             try {
@@ -465,18 +625,29 @@ app.post('/api/cli/workflow', async (req, res) => {
 
     // Run workflow steps
     for (const step of steps) {
-      const result = await runCommandStep(
-        step,
-        executablePath,
-        workDir,
-        variables,
-        () => {} // No streaming
-      );
+      let result;
+      if (step.type === 'http') {
+        // HTTP request step
+        result = await runHttpStep(
+          step,
+          variables,
+          () => {} // No streaming
+        );
+      } else {
+        // Command step
+        result = await runCommandStep(
+          step,
+          executablePath,
+          workDir,
+          variables,
+          () => {} // No streaming
+        );
+      }
 
       results.push(result);
 
-      // Capture variables
-      if (step.capture) {
+      // Capture variables (for command steps)
+      if (step.capture && step.type !== 'http') {
         step.capture.forEach(cap => {
           if (cap.varName && cap.regex) {
             try {

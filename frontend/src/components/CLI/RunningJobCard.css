@@ -1,0 +1,172 @@
+/* Running Job Card - Displays background jobs in execution history */
+
+.running-job-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.running-job-card:hover {
+  background: var(--color-bg-hover);
+}
+
+.running-job-card.running {
+  border-color: var(--color-accent);
+}
+
+.running-job-card.completed {
+  border-color: var(--color-success);
+}
+
+.running-job-card.failed,
+.running-job-card.cancelled {
+  border-color: var(--color-error);
+}
+
+.running-job-card.interrupted {
+  border-color: var(--color-warning);
+}
+
+/* Header */
+.running-job-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.running-job-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.running-job-status.running {
+  background: rgba(0, 122, 255, 0.15);
+  color: var(--color-accent);
+}
+
+.running-job-status.completed {
+  background: rgba(52, 199, 89, 0.15);
+  color: var(--color-success);
+}
+
+.running-job-status.failed,
+.running-job-status.cancelled {
+  background: rgba(255, 59, 48, 0.15);
+  color: var(--color-error);
+}
+
+.running-job-status.interrupted {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+}
+
+.status-spinner {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.running-job-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-fg-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.running-job-name .config-name {
+  font-weight: 400;
+  color: var(--color-fg-tertiary);
+}
+
+.running-job-elapsed {
+  font-size: 13px;
+  font-family: var(--font-family-mono);
+  color: var(--color-fg-tertiary);
+}
+
+/* Progress */
+.running-job-progress {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+.progress-bar {
+  height: 4px;
+  background: rgba(118, 118, 128, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--color-fg-quaternary);
+}
+
+/* Error message */
+.running-job-error {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  font-size: 12px;
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.08);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.running-job-card.failed .running-job-error,
+.running-job-card.cancelled .running-job-error {
+  color: var(--color-error);
+  background: rgba(255, 59, 48, 0.08);
+}
+
+/* Actions */
+.running-job-actions {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.cancel-job-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  color: var(--color-fg-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancel-job-btn:hover {
+  background: rgba(255, 59, 48, 0.1);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}

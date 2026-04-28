@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { uploadExecutable, runWorkflowStreaming, cancelWorkflow } from '../../utils/cli';
 import { formatWorkflowForExecution } from '../../utils/workflowFormatter';
+import { useBackgroundJobs } from '../../context/BackgroundJobsContext';
 import { StepDetails } from './StepDetails';
 import './RunModal.css';
 
-export function RunModal({ tests = [], onClose, onResult }) {
+export function RunModal({ tests = [], onClose, onResult, serviceId }) {
+  const { startJob } = useBackgroundJobs();
   const [executableFile, setExecutableFile] = useState(null);
   const [executableName, setExecutableName] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -24,13 +26,12 @@ export function RunModal({ tests = [], onClose, onResult }) {
 
   // Elapsed time tracking for running steps
   const [stepStartTimes, setStepStartTimes] = useState({}); // { `${configId}-${stepId}`: timestamp }
-  const [elapsedTick, setElapsedTick] = useState(0); // Force re-render for elapsed time
+  const [, setElapsedTick] = useState(0); // Force re-render for elapsed time
   const timerRef = useRef(null);
 
   // Live output tracking per step
   const [liveOutput, setLiveOutput] = useState({}); // { `${configId}-${stepId}`: { stdout: '', stderr: '' } }
   const [capturedVars, setCapturedVars] = useState({}); // { `${configId}-${stepId}`: { varName: value, ... } }
-  const outputRefs = useRef({}); // Refs for auto-scrolling
 
   // Start/stop elapsed time ticker when running
   useEffect(() => {
@@ -391,6 +392,49 @@ export function RunModal({ tests = [], onClose, onResult }) {
     }
   };
 
+  const handleRunInBackground = async () => {
+    if (!executableFile) {
+      setError('Please upload an executable');
+      return;
+    }
+
+    if (!serviceId) {
+      setError('Service ID is required for background jobs');
+      return;
+    }
+
+    // Ensure we have at least one configuration
+    let configsToRun = configurations;
+    if (configsToRun.length === 0) {
+      const defaultVars = {};
+      workflowVariables.forEach((v, index) => {
+        const varId = getVarId(v, index);
+        defaultVars[varId] = v.defaultValue || '';
+      });
+      configsToRun = [{
+        id: `config-${Date.now()}`,
+        name: 'Run 1',
+        variables: defaultVars
+      }];
+    }
+
+    setError(null);
+
+    try {
+      const test = tests[0];
+
+      // Start background jobs for each configuration
+      for (const config of configsToRun) {
+        await startJob(test, executableFile, serviceId, config);
+      }
+
+      // Close modal immediately - jobs run in background
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const getStepIcon = (status) => {
     switch (status) {
       case 'running':
@@ -530,7 +574,7 @@ export function RunModal({ tests = [], onClose, onResult }) {
                   {configurations.map((config, index) => (
                     <div key={config.id} className="config-card">
                       <div className="config-header" onClick={() => toggleConfigExpand(config.id)}>
-                        <span className="config-expand">{expandedConfigs[config.id] ? '▼' : '▶'}</span>
+                        <span className={`config-chevron ${expandedConfigs[config.id] ? 'expanded' : ''}`} />
                         <input
                           type="text"
                           className="config-name-input"
@@ -589,11 +633,44 @@ export function RunModal({ tests = [], onClose, onResult }) {
               <button className="cancel-btn" onClick={onClose}>
                 Cancel
               </button>
-              <button className="run-btn" onClick={handleRun}>
-                {configurations.length > 1
-                  ? `Run ${configurations.length} Configurations`
-                  : 'Run Test'}
-              </button>
+              <div className="run-dropdown">
+                <button className="run-btn" onClick={handleRun} disabled={!executableFile}>
+                  {configurations.length > 1
+                    ? `Run ${configurations.length} Configurations`
+                    : 'Run'}
+                </button>
+                <div className="run-dropdown-divider" />
+                <button
+                  className="run-dropdown-toggle"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const menu = e.currentTarget.parentElement.querySelector('.run-dropdown-menu');
+                    const isOpen = menu.classList.contains('show');
+                    menu.classList.toggle('show');
+
+                    if (!isOpen) {
+                      const closeMenu = (evt) => {
+                        if (!menu.contains(evt.target)) {
+                          menu.classList.remove('show');
+                          document.removeEventListener('click', closeMenu);
+                        }
+                      };
+                      setTimeout(() => document.addEventListener('click', closeMenu), 0);
+                    }
+                  }}
+                  disabled={!executableFile}
+                >
+                  <span className="dropdown-chevron" />
+                </button>
+                <div className="run-dropdown-menu">
+                  <button onClick={(e) => { e.currentTarget.closest('.run-dropdown-menu').classList.remove('show'); handleRun(); }}>
+                    Run
+                  </button>
+                  <button onClick={(e) => { e.currentTarget.closest('.run-dropdown-menu').classList.remove('show'); handleRunInBackground(); }}>
+                    Run in Background
+                  </button>
+                </div>
+              </div>
             </div>
           </>
         ) : isRunning ? (
@@ -646,7 +723,7 @@ export function RunModal({ tests = [], onClose, onResult }) {
                           {Object.entries(config.variables).map(([k, v]) => `${k}=${v}`).join(', ')}
                         </span>
                       )}
-                      <span className="config-expand-icon">{isConfigExpanded ? '▼' : '▶'}</span>
+                      <span className={`config-chevron ${isConfigExpanded ? 'expanded' : ''}`} />
                     </div>
 
                     {isConfigExpanded && (
@@ -681,7 +758,7 @@ export function RunModal({ tests = [], onClose, onResult }) {
                                   <span className="step-duration">{result.duration}ms</span>
                                 )}
                                 {(hasResult || status === 'running') && (
-                                  <span className="expand-icon">{isStepExpanded ? '▼' : '▶'}</span>
+                                  <span className={`step-chevron ${isStepExpanded ? 'expanded' : ''}`} />
                                 )}
                               </div>
 

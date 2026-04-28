@@ -2,7 +2,6 @@
 
 .service-view {
   padding: var(--space-8);
-  max-width: 1400px;
 }
 
 /* Not Found State */
