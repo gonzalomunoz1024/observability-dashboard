@@ -127,6 +127,7 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
 
   const result = {
     name: workflow.name,
+    executable,  // Server expects this at workflow level
     env,
     steps: workflow.steps.map((step) => {
       const autoDeps = getAutoDependencies(step);
