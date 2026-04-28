@@ -408,7 +408,48 @@ app.post('/api/cli/workflow', async (req, res) => {
   }
 });
 
-// Health check
+// Health check proxy - checks external service health
+app.post('/api/health-check', async (req, res) => {
+  const { url, method = 'GET', timeout = 5000, expectedStatus = 200 } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  const startTime = Date.now();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      method,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const responseTime = Date.now() - startTime;
+    const isHealthy = response.status === expectedStatus;
+
+    res.json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      statusCode: response.status,
+      responseTime,
+      expectedStatus,
+    });
+  } catch (error) {
+    clearTimeout(timeoutId);
+    const responseTime = Date.now() - startTime;
+
+    res.json({
+      status: 'unhealthy',
+      statusCode: null,
+      responseTime,
+      error: error.name === 'AbortError' ? 'Request timeout' : error.message,
+    });
+  }
+});
+
+// Health check for CLI proxy itself
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });

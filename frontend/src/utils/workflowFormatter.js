@@ -53,6 +53,11 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
   // Override with runtime variables
   Object.assign(variables, runtimeVariables);
 
+  // Debug logging
+  console.log('[formatWorkflowForExecution] workflow.variables:', workflow.variables);
+  console.log('[formatWorkflowForExecution] runtimeVariables:', runtimeVariables);
+  console.log('[formatWorkflowForExecution] merged variables:', variables);
+
   const env = workflow.envVars
     ? Object.fromEntries(
         workflow.envVars.split('\n').filter(Boolean).map((line) => {
@@ -176,7 +181,10 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
   }
 
   // Apply variable substitution to all string fields
-  return substituteInObject(result, variables);
+  const substituted = substituteInObject(result, variables);
+  console.log('[formatWorkflowForExecution] BEFORE substitution - first step args:', result.steps?.[0]?.args);
+  console.log('[formatWorkflowForExecution] AFTER substitution - first step args:', substituted.steps?.[0]?.args);
+  return substituted;
 }
 
 function parseHeaders(headersStr) {
