@@ -1,83 +1,84 @@
-# Dashboard Local Bundle
+# Observability Forge Dashboard - Local Bundle
 
-Run the complete dashboard application (frontend + backend) from a single JAR file.
+Run the complete dashboard application from a single command.
 
 ## Requirements
 
-- **Java 17+** - Required to run the application
-- **Node.js 18+** - Required only for building
-- **npm** - Required only for building
+- **Java 17+** - Required to run the dashboard
+- **Node.js 18+** - Required for CLI test execution
+- **npm** - Required for building and CLI server
 
 ## Quick Start
 
 ### macOS / Linux
 
 ```bash
-# Build and run (first time)
+# Build (first time only)
 ./build.sh
-./run.sh
 
-# Or just run (will build if JAR doesn't exist)
+# Run
 ./run.sh
 ```
 
 ### Windows
 
 ```batch
-# Build and run (first time)
+# Build (first time only)
 build.bat
-run.bat
 
-# Or just run (will build if JAR doesn't exist)
+# Run
 run.bat
 ```
 
 ## Access the Application
 
-Once running, open your browser to: **http://localhost:3001**
+Once running, open your browser to: **http://localhost:8080**
+
+Two services will be started:
+- **Dashboard** (port 8080) - The main web application
+- **CLI Proxy** (port 3001) - Handles CLI test execution with live output streaming
 
 ## What Gets Built
 
-The build process:
-1. Builds the React frontend into optimized static files
-2. Bundles the static files into the Spring Boot JAR
-3. Produces a single `dashboard.jar` that serves both frontend and API
+The build process creates:
+1. `dashboard.jar` - Spring Boot application with bundled React frontend
+2. `cli-server/` - Node.js server for CLI test execution
+
+## Distribution
+
+To share with others, give them the entire `local-artifacts` folder containing:
+- `dashboard.jar`
+- `cli-server/` directory
+- `run.sh` / `run.bat`
+
+Requirements for recipients:
+- **Java 17+** - [Download from Adoptium](https://adoptium.net/)
+- **Node.js 18+** - [Download from nodejs.org](https://nodejs.org/)
 
 ## Configuration
 
-You can pass additional Java options or Spring properties:
+You can pass additional Java options:
 
 ```bash
-# Change port
-./run.sh --server.port=8080
+# Change dashboard port
+./run.sh --server.port=9090
 
-# Enable Kafka (if you have it running)
+# Enable Kafka (if available)
 ./run.sh -Dspring.kafka.bootstrap-servers=localhost:9092
 
 # Enable health monitoring
 ./run.sh -Dhealth-monitor.scheduler.enabled=true
 ```
 
-## Distribution
-
-To share with others, they only need:
-- `dashboard.jar` - The bundled application
-- **Java 17+** installed
-
-They can run it with:
-```bash
-java -jar dashboard.jar
-```
-
 ## Troubleshooting
 
 **Port already in use:**
 ```bash
-./run.sh --server.port=8080
+./run.sh --server.port=9090
 ```
 
-**Kafka connection errors:**
-These are disabled by default in run.sh. If you see warnings, they can be ignored.
+**CLI tests not working:**
+Make sure Node.js is installed and the `cli-server` directory exists.
 
-**Frontend not loading:**
-Make sure the build completed successfully. Check that `src/main/resources/static/index.html` exists in the backend after building.
+**Kafka connection errors:**
+These are disabled by default and can be ignored.
