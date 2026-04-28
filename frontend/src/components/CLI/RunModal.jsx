@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { uploadExecutable, runWorkflowStreaming } from '../../utils/cli';
+import { uploadExecutable, runWorkflowStreaming, cancelWorkflow } from '../../utils/cli';
 import { formatWorkflowForExecution } from '../../utils/workflowFormatter';
 import { cleanCliOutput } from '../../utils/outputCleaner';
 import './RunModal.css';
@@ -10,6 +10,7 @@ export function RunModal({ tests = [], onClose, onResult }) {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
+  const [activeStreamIds, setActiveStreamIds] = useState({}); // configId -> streamId
 
   // Configurations for parallel runs with different variable values
   const [configurations, setConfigurations] = useState([]);
@@ -233,6 +234,11 @@ export function RunModal({ tests = [], onClose, onResult }) {
       let finalResult = null;
 
       await runWorkflowStreaming(formatted, {
+        onStreamId: (streamId) => {
+          console.log('Stream ID:', streamId);
+          setActiveStreamIds(prev => ({ ...prev, [configId]: streamId }));
+        },
+
         onStart: (data) => {
           console.log('Workflow started:', data);
         },
@@ -395,6 +401,23 @@ export function RunModal({ tests = [], onClose, onResult }) {
     if (!isRunning || statusMessage === 'Complete' || statusMessage === 'Error') {
       onClose();
     }
+  };
+
+  const handleCancel = async () => {
+    // Cancel all active workflows
+    const streamIds = Object.values(activeStreamIds);
+    for (const streamId of streamIds) {
+      if (streamId) {
+        try {
+          await cancelWorkflow(streamId);
+          console.log('Cancelled workflow:', streamId);
+        } catch (err) {
+          console.error('Failed to cancel workflow:', err);
+        }
+      }
+    }
+    setStatusMessage('Cancelled');
+    setIsRunning(false);
   };
 
   const isFinished = statusMessage === 'Complete' || statusMessage === 'Error';
@@ -825,13 +848,13 @@ export function RunModal({ tests = [], onClose, onResult }) {
             {error && <div className="run-modal-error">{error}</div>}
 
             <div className="run-modal-actions">
-              {isFinished ? (
+              {isFinished || statusMessage === 'Cancelled' ? (
                 <button className="run-btn" onClick={handleClose}>
                   Close
                 </button>
               ) : (
-                <button className="cancel-btn" disabled>
-                  Running...
+                <button className="cancel-btn" onClick={handleCancel}>
+                  Cancel
                 </button>
               )}
             </div>

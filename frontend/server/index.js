@@ -30,8 +30,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Store active SSE connections
+// Store active SSE connections and processes
 const activeStreams = new Map();
+const activeProcesses = new Map(); // streamId -> { proc, cancelled }
 
 // Upload executable endpoint
 app.post('/api/cli/executable/upload', upload.single('file'), (req, res) => {
@@ -64,7 +65,7 @@ function interpolateVariables(str, variables) {
 }
 
 // Run a single command step
-async function runCommandStep(step, executablePath, workDir, variables, onOutput) {
+async function runCommandStep(step, executablePath, workDir, variables, onOutput, streamId = null) {
   return new Promise((resolve) => {
     const startTime = Date.now();
     let stdout = '';
@@ -96,6 +97,11 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
       env: { ...process.env, ...parseEnvVars(step.envVars) }
     });
 
+    // Track process for cancellation
+    if (streamId) {
+      activeProcesses.set(streamId, { proc, cancelled: false });
+    }
+
     // Explicit timeout handling
     const timeoutMs = step.timeout || 30000;
     timeoutHandle = setTimeout(() => {
@@ -110,10 +116,58 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
       }
     }, timeoutMs);
 
+    // Stdin handling state
+    let inputIndex = 0;
+    let inputs = [];
+    let lastStdoutTime = 0;
+    let waitingForPrompt = false;
+    let promptCheckInterval = null;
+
+    // Handle stdin inputs if configured - wait for prompts before sending
+    if (step.stdinInputs) {
+      console.log('[runCommandStep] Raw stdinInputs:', JSON.stringify(step.stdinInputs));
+
+      const interpolatedInputs = interpolateVariables(step.stdinInputs, variables);
+      console.log('[runCommandStep] Interpolated stdinInputs:', JSON.stringify(interpolatedInputs));
+
+      inputs = interpolatedInputs.split('\n').filter(line => line !== '');
+      console.log('[runCommandStep] Stdin inputs array:', inputs);
+
+      onOutput({ type: 'stdout', data: `[DEBUG] Raw stdinInputs: ${JSON.stringify(step.stdinInputs)}\n` });
+      onOutput({ type: 'stdout', data: `[DEBUG] Interpolated stdinInputs: ${JSON.stringify(interpolatedInputs)}\n` });
+      onOutput({ type: 'stdout', data: `[DEBUG] Stdin inputs array (${inputs.length} items): ${JSON.stringify(inputs)}\n` });
+      onOutput({ type: 'stdout', data: `[INFO] Will send ${inputs.length} stdin input(s), waiting for prompts...\n` });
+
+      waitingForPrompt = true;
+    }
+
+    // Function to send next stdin input
+    const sendNextInput = () => {
+      if (inputIndex < inputs.length && !resolved) {
+        const input = inputs[inputIndex];
+        onOutput({ type: 'stdout', data: `[STDIN ${inputIndex + 1}/${inputs.length}] > ${input}\n` });
+        proc.stdin.write(input + '\n');
+        inputIndex++;
+        waitingForPrompt = true;
+      }
+    };
+
     proc.stdout.on('data', (data) => {
       const text = data.toString();
       stdout += text;
       onOutput({ type: 'stdout', data: text });
+      lastStdoutTime = Date.now();
+
+      // If we're waiting for a prompt and got stdout, schedule sending next input
+      if (waitingForPrompt && inputIndex < inputs.length && !resolved) {
+        waitingForPrompt = false;
+        // Wait for prompt to finish rendering, then send input
+        setTimeout(() => {
+          if (!resolved) {
+            sendNextInput();
+          }
+        }, step.stdinDelay || 300);
+      }
     });
 
     proc.stderr.on('data', (data) => {
@@ -122,49 +176,20 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
       onOutput({ type: 'stderr', data: text });
     });
 
-    // Handle stdin inputs if configured
-    if (step.stdinInputs) {
-      console.log('[runCommandStep] Raw stdinInputs:', JSON.stringify(step.stdinInputs));
-
-      // Interpolate variables in stdin inputs
-      const interpolatedInputs = interpolateVariables(step.stdinInputs, variables);
-      console.log('[runCommandStep] Interpolated stdinInputs:', JSON.stringify(interpolatedInputs));
-
-      const inputs = interpolatedInputs.split('\n').filter(line => line !== '');
-      console.log('[runCommandStep] Stdin inputs array:', inputs);
-
-      let inputIndex = 0;
-
-      onOutput({ type: 'stdout', data: `[DEBUG] Raw stdinInputs: ${JSON.stringify(step.stdinInputs)}\n` });
-      onOutput({ type: 'stdout', data: `[DEBUG] Interpolated stdinInputs: ${JSON.stringify(interpolatedInputs)}\n` });
-      onOutput({ type: 'stdout', data: `[DEBUG] Stdin inputs array (${inputs.length} items): ${JSON.stringify(inputs)}\n` });
-      onOutput({ type: 'stdout', data: `[INFO] Sending ${inputs.length} stdin input(s) with ${step.stdinDelay || 100}ms delay\n` });
-
-      const sendInput = () => {
-        if (inputIndex < inputs.length && !resolved) {
-          setTimeout(() => {
-            if (resolved) return;
-            const input = inputs[inputIndex];
-            onOutput({ type: 'stdout', data: `[STDIN] > ${input}\n` });
-            proc.stdin.write(input + '\n');
-            inputIndex++;
-            sendInput();
-          }, step.stdinDelay || 100);
-        }
-      };
-      sendInput();
-    }
-
     proc.on('close', (code, signal) => {
       if (resolved) return;
       resolved = true;
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      if (promptCheckInterval) clearInterval(promptCheckInterval);
+      if (streamId) activeProcesses.delete(streamId);
 
       const duration = Date.now() - startTime;
       const exitCode = code ?? (signal ? -1 : -1);
+      const wasCancelled = streamId && activeProcesses.get(streamId)?.cancelled;
 
       if (signal) {
-        onOutput({ type: 'stderr', data: `[INFO] Process terminated by signal: ${signal}\n` });
+        const reason = wasCancelled ? 'User cancelled' : signal;
+        onOutput({ type: 'stderr', data: `[INFO] Process terminated: ${reason}\n` });
       }
 
       // Run validations
@@ -322,7 +347,8 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
         executablePath,
         workDir,
         variables,
-        (output) => sendEvent('output', { stepId: step.id, ...output })
+        (output) => sendEvent('output', { stepId: step.id, ...output }),
+        streamId
       );
 
       results.push(result);
@@ -460,6 +486,28 @@ app.post('/api/cli/workflow', async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Cancel a running workflow
+app.post('/api/cli/workflow/cancel/:streamId', (req, res) => {
+  const { streamId } = req.params;
+  const processInfo = activeProcesses.get(streamId);
+
+  if (processInfo) {
+    console.log(`[CANCEL] Cancelling workflow ${streamId}`);
+    processInfo.cancelled = true;
+    if (processInfo.proc && !processInfo.proc.killed) {
+      processInfo.proc.kill('SIGTERM');
+      setTimeout(() => {
+        if (processInfo.proc && !processInfo.proc.killed) {
+          processInfo.proc.kill('SIGKILL');
+        }
+      }, 2000);
+    }
+    res.json({ success: true, message: 'Workflow cancelled' });
+  } else {
+    res.status(404).json({ error: 'Workflow not found or already completed' });
   }
 });
 

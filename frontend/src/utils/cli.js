@@ -94,7 +94,7 @@ export async function runWorkflowWithProgress(workflow, onStepStart, onStepCompl
 
 // Workflow execution with SSE streaming for live output
 export function runWorkflowStreaming(workflow, callbacks) {
-  const { onStart, onStepStart, onOutput, onStepComplete, onComplete, onError } = callbacks;
+  const { onStart, onStepStart, onOutput, onStepComplete, onComplete, onError, onStreamId } = callbacks;
 
   return new Promise((resolve, reject) => {
     fetch(`${PROXY_URL}/api/cli/workflow/stream`, {
@@ -104,6 +104,12 @@ export function runWorkflowStreaming(workflow, callbacks) {
     }).then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Get streamId from response header for cancellation
+      const streamId = response.headers.get('X-Stream-Id');
+      if (streamId && onStreamId) {
+        onStreamId(streamId);
       }
 
       const reader = response.body.getReader();
@@ -188,6 +194,19 @@ export async function runSuiteParallel(name, tests = []) {
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to run parallel suite');
+  }
+
+  return response.json();
+}
+
+export async function cancelWorkflow(streamId) {
+  const response = await fetch(`${PROXY_URL}/api/cli/workflow/cancel/${streamId}`, {
+    method: 'POST',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || error.error || 'Failed to cancel workflow');
   }
 
   return response.json();
