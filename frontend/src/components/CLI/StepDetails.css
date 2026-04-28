@@ -1,0 +1,192 @@
+/* Shared Step Details Component Styles */
+
+.step-details {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.step-details .detail-section {
+  margin-bottom: var(--space-3);
+}
+
+.step-details .detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.step-details .detail-section h5 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-details .detail-section code {
+  display: block;
+  padding: var(--space-2);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-secondary);
+  font-family: var(--font-family-mono);
+  word-break: break-all;
+}
+
+.step-details .detail-row {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.step-details .detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.step-details .detail-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-details .success {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.step-details .error {
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+.step-details .output {
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-mono);
+  color: var(--color-fg-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.step-details .output.scrollable {
+  max-height: 200px;
+}
+
+.step-details .output.error {
+  background: rgba(255, 59, 48, 0.05);
+  border-color: rgba(255, 59, 48, 0.2);
+  color: var(--color-error);
+}
+
+.step-details .http-status {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.step-details .poll-info {
+  color: var(--color-fg-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+/* Validations */
+.step-details .validations-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.step-details .validation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+.step-details .validation-item.pass {
+  background: rgba(52, 199, 89, 0.08);
+}
+
+.step-details .validation-item.fail {
+  background: rgba(255, 59, 48, 0.08);
+}
+
+.step-details .validation-icon {
+  flex-shrink: 0;
+}
+
+.step-details .validation-item.pass .validation-icon {
+  color: var(--color-success);
+}
+
+.step-details .validation-item.fail .validation-icon {
+  color: var(--color-error);
+}
+
+.step-details .validation-type {
+  font-weight: 500;
+  color: var(--color-fg-primary);
+}
+
+.step-details .validation-expected,
+.step-details .validation-actual {
+  color: var(--color-fg-tertiary);
+  font-family: var(--font-family-mono);
+}
+
+.step-details .validation-actual {
+  color: var(--color-error);
+}
+
+/* Captured Variables */
+.step-details .captured-vars-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.step-details .captured-var-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: rgba(52, 199, 89, 0.08);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-success);
+}
+
+.step-details .captured-var-name {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-success);
+  font-family: var(--font-family-mono);
+}
+
+.step-details .captured-var-equals {
+  color: var(--color-fg-quaternary);
+}
+
+.step-details .captured-var-value {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-primary);
+  font-family: var(--font-family-mono);
+  background: var(--color-bg-primary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+}

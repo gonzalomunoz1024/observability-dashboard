@@ -50,6 +50,7 @@ export function CLIPanel({ serviceId }) {
       stdout: step.stdout,
       stderr: step.stderr,
       duration: step.duration,
+      captures: step.captures || {},
       validation: {
         passed: step.passed ?? false,
         validations: step.validations || []
@@ -296,7 +297,6 @@ export function CLIPanel({ serviceId }) {
                           {result.passed ? 'PASSED' : 'FAILED'}
                         </span>
                         <span className="result-name">{result.workflowName}</span>
-                        <span className="result-exe">{result.executable}</span>
                         <span className="result-time">
                           {new Date(result.timestamp).toLocaleTimeString()}
                         </span>
