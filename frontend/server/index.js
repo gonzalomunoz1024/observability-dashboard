@@ -713,6 +713,41 @@ app.post('/api/cli/workflow/cancel/:streamId', (req, res) => {
   }
 });
 
+// Turns an opaque Node fetch failure into something a human can triage.
+// undici throws `TypeError: fetch failed` and puts the real reason on .cause
+function describeFetchError(error) {
+  if (error.name === 'AbortError') {
+    return { error: 'Request timed out before the server responded', errorCode: 'TIMEOUT' };
+  }
+
+  const cause = error.cause || error;
+  const code = cause.code || error.code || null;
+  const detail = cause.message || error.message || 'Request failed';
+
+  const hints = {
+    ECONNREFUSED: 'Connection refused — nothing is listening on that host/port (is the service running? correct port? note localhost may resolve to IPv6 ::1)',
+    ENOTFOUND: 'DNS lookup failed — host not found (check the hostname)',
+    EAI_AGAIN: 'DNS lookup timed out (network/DNS issue)',
+    ETIMEDOUT: 'Connection timed out (host unreachable or firewalled)',
+    UND_ERR_CONNECT_TIMEOUT: 'Connection timed out (host unreachable or firewalled)',
+    ECONNRESET: 'Connection reset by the remote server',
+    EHOSTUNREACH: 'Host unreachable (routing/firewall)',
+    EPROTO: 'TLS/protocol error (e.g. https requested on an http port)',
+    DEPTH_ZERO_SELF_SIGNED_CERT: 'TLS error — self-signed certificate',
+    SELF_SIGNED_CERT_IN_CHAIN: 'TLS error — self-signed certificate in chain',
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'TLS error — unable to verify certificate chain',
+    CERT_HAS_EXPIRED: 'TLS error — server certificate has expired',
+    ERR_TLS_CERT_ALTNAME_INVALID: 'TLS error — certificate does not match the hostname',
+  };
+
+  const friendly = code && hints[code] ? hints[code] : detail;
+  return {
+    error: code ? `${friendly} [${code}]` : friendly,
+    errorCode: code,
+    errorDetail: detail,
+  };
+}
+
 // Health check proxy - checks external service health
 app.post('/api/health-check', async (req, res) => {
   const { url, method = 'GET', timeout = 5000, expectedStatus = 200 } = req.body;
@@ -744,12 +779,20 @@ app.post('/api/health-check', async (req, res) => {
   } catch (error) {
     clearTimeout(timeoutId);
     const responseTime = Date.now() - startTime;
+    const described = describeFetchError(error);
+
+    console.error(
+      `[health-check] ${method} ${url} failed after ${responseTime}ms:`,
+      described.errorCode || error.name,
+      '-',
+      described.errorDetail || error.message
+    );
 
     res.json({
       status: 'unhealthy',
       statusCode: null,
       responseTime,
-      error: error.name === 'AbortError' ? 'Request timeout' : error.message,
+      ...described,
     });
   }
 });
