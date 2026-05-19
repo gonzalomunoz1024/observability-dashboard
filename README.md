@@ -1,71 +1,84 @@
-# Getting Started with Create React App
+# Observability Forge Dashboard - Local Bundle
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Run the complete dashboard application from a single command.
 
-## Available Scripts
+## Requirements
 
-In the project directory, you can run:
+- **Java 17+** - Required to run the dashboard
+- **Node.js 18+** - Required for CLI test execution
+- **npm** - Required for building and CLI server
 
-### `npm start`
+## Quick Start
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### macOS / Linux
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```bash
+# Build (first time only)
+./build.sh
 
-### `npm test`
+# Run
+./run.sh
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Windows
 
-### `npm run build`
+```batch
+# Build (first time only)
+build.bat
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+# Run
+run.bat
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Access the Application
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Once running, open your browser to: **http://localhost:8080**
 
-### `npm run eject`
+Two services will be started:
+- **Dashboard** (port 8080) - The main web application
+- **CLI Proxy** (port 3001) - Handles CLI test execution with live output streaming
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## What Gets Built
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+The build process creates:
+1. `dashboard.jar` - Spring Boot application with bundled React frontend
+2. `cli-server/` - Node.js server for CLI test execution
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Distribution
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+To share with others, give them the entire `local-artifacts` folder containing:
+- `dashboard.jar`
+- `cli-server/` directory
+- `run.sh` / `run.bat`
 
-## Learn More
+Requirements for recipients:
+- **Java 17+** - [Download from Adoptium](https://adoptium.net/)
+- **Node.js 18+** - [Download from nodejs.org](https://nodejs.org/)
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Configuration
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+You can pass additional Java options:
 
-### Code Splitting
+```bash
+# Change dashboard port
+./run.sh --server.port=9090
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+# Enable Kafka (if available)
+./run.sh -Dspring.kafka.bootstrap-servers=localhost:9092
 
-### Analyzing the Bundle Size
+# Enable health monitoring
+./run.sh -Dhealth-monitor.scheduler.enabled=true
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## Troubleshooting
 
-### Making a Progressive Web App
+**Port already in use:**
+```bash
+./run.sh --server.port=9090
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+**CLI tests not working:**
+Make sure Node.js is installed and the `cli-server` directory exists.
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
-# observability-dashboard
+**Kafka connection errors:**
+These are disabled by default and can be ignored.
