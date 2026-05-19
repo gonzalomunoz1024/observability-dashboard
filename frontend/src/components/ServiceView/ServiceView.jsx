@@ -54,6 +54,11 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
       ]
     : [{ id: 'cli', label: 'Regression Suite' }];
 
+  // `activeTab` is seeded at mount when `service` may still be loading from
+  // storage. Once the service resolves, fall back to the first valid tab so
+  // CLI services always land on Regression Suite instead of blank content.
+  const currentTab = tabs.some(t => t.id === activeTab) ? activeTab : tabs[0].id;
+
   return (
     <div className="service-view">
       <div className="service-header">
@@ -72,7 +77,7 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
         {tabs.map(tab => (
           <button
             key={tab.id}
-            className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+            className={`tab ${currentTab === tab.id ? 'active' : ''}`}
             onClick={() => setActiveTab(tab.id)}
           >
             {tab.label}
@@ -81,7 +86,7 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
       </div>
 
       <div className="tab-content">
-        {activeTab === 'health' && isRest && (
+        {currentTab === 'health' && isRest && (
           <div className="health-content">
             <ServiceCard
               service={service}
@@ -92,19 +97,19 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
           </div>
         )}
 
-        {activeTab === 'synthetic' && isRest && (
+        {currentTab === 'synthetic' && isRest && (
           <SyntheticPanel />
         )}
 
-        {activeTab === 'loadtest' && isRest && (
+        {currentTab === 'loadtest' && isRest && (
           <LoadTestPanel />
         )}
 
-        {activeTab === 'alerts' && isRest && (
+        {currentTab === 'alerts' && isRest && (
           <AlertingPanel serviceId={serviceId} />
         )}
 
-        {activeTab === 'cli' && !isRest && (
+        {currentTab === 'cli' && !isRest && (
           <CLIPanel serviceId={serviceId} />
         )}
       </div>
