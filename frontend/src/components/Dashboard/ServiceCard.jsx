@@ -25,7 +25,27 @@ export const ServiceCard = memo(function ServiceCard({ service, status, onCheckN
     <div className={`service-card status-border-${status?.status || 'unknown'}`}>
       <div className="card-header">
         <h3 className="service-name">{service.name}</h3>
-        <StatusIndicator status={status?.status || 'unknown'} />
+        <div className="card-header-right">
+          <StatusIndicator status={status?.status || 'unknown'} />
+          {onEdit && (
+            <button
+              className="card-edit-btn"
+              onClick={onEdit}
+              title="Edit service"
+              aria-label="Edit service"
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="card-url">{service.url}</div>
@@ -52,24 +72,6 @@ export const ServiceCard = memo(function ServiceCard({ service, status, onCheckN
       )}
 
       <div className="card-actions">
-        {onEdit && (
-          <button
-            className="action-btn edit-btn"
-            onClick={onEdit}
-            title="Edit service"
-            aria-label="Edit service"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        )}
         <button className="action-btn check-btn" onClick={onCheckNow}>
           Check Now
         </button>
