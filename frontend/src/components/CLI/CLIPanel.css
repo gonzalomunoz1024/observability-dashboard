@@ -458,6 +458,38 @@
   color: var(--color-fg-quaternary);
 }
 
+/* Export controls */
+.results-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.result-export {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.result-export button {
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  color: var(--color-fg-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.result-export button:hover {
+  background: var(--color-bg-primary);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 /* Create View */
 .create-view {
   height: 100%;

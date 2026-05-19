@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { uploadExecutable, runWorkflowStreaming, cancelWorkflow } from '../../utils/cli';
 import { formatWorkflowForExecution } from '../../utils/workflowFormatter';
+import { exportRunReport, exportRunsReport } from '../../utils/reportExport';
 import { useBackgroundJobs } from '../../context/BackgroundJobsContext';
 import { StepDetails } from './StepDetails';
 import './RunModal.css';
@@ -529,6 +530,27 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
 
   const isFinished = statusMessage === 'Complete' || statusMessage === 'Error';
 
+  // Build evidence report(s) from the completed configurations
+  const handleExportReport = () => {
+    const runs = completedConfigs
+      .filter(c => c.result)
+      .map(c => ({
+        workflowName: tests[0]?.name || 'Test Suite',
+        timestamp: new Date().toISOString(),
+        passed: c.passed,
+        configName: c.config?.name || null,
+        variables: c.config?.variables || null,
+        results: c.result?.steps || c.result?.results || [],
+        summary: c.result?.summary,
+      }));
+    if (runs.length === 0) return;
+    if (runs.length === 1) {
+      exportRunReport(runs[0]);
+    } else {
+      exportRunsReport(runs, { title: `${tests[0]?.name || 'Test Suite'} — Run Evidence` });
+    }
+  };
+
   // Get current test for display
   const currentTest = tests[0];
   const currentSteps = currentTest?.steps || [];
@@ -983,9 +1005,20 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
 
             <div className="run-modal-actions">
               {isFinished || statusMessage === 'Cancelled' ? (
-                <button className="run-btn" onClick={handleClose}>
-                  Close
-                </button>
+                <>
+                  {completedConfigs.some(c => c.result) && (
+                    <button
+                      className="cancel-btn"
+                      onClick={handleExportReport}
+                      title="Download a printable evidence report (inputs & outputs) for these runs"
+                    >
+                      Export Report
+                    </button>
+                  )}
+                  <button className="run-btn" onClick={handleClose}>
+                    Close
+                  </button>
+                </>
               ) : (
                 <button className="cancel-btn" onClick={handleCancel}>
                   Cancel

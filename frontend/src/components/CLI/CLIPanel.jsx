@@ -5,6 +5,7 @@ import { CLIResults } from './CLIResults';
 import { RunningJobCard } from './RunningJobCard';
 import { useServiceJobs, useBackgroundJobs } from '../../context/BackgroundJobsContext';
 import { getSavedWorkflows, getExecutionHistory, saveExecutionResult, clearExecutionHistory, exportWorkflows, importWorkflows, deleteWorkflow } from '../../utils/workflowStorage';
+import { exportRunReport, exportRunAsJson, exportRunAsMarkdown, exportRunsReport, exportRunsAsJson } from '../../utils/reportExport';
 import './CLIPanel.css';
 
 export function CLIPanel({ serviceId }) {
@@ -56,7 +57,7 @@ export function CLIPanel({ serviceId }) {
   };
 
   // Handle results from RunModal for Execution History
-  const handleTestResult = (workflow, result, executablePath) => {
+  const handleTestResult = (workflow, result, executablePath, config) => {
     const steps = result?.steps || result?.results || [];
     const transformedResults = steps.map(step => ({
       ...step,
@@ -84,7 +85,9 @@ export function CLIPanel({ serviceId }) {
       results: transformedResults,
       timestamp: new Date().toISOString(),
       workflowName: workflow.name,
-      executable: executablePath
+      executable: executablePath,
+      configName: config?.name || null,
+      variables: config?.variables || null
     };
 
     const updated = saveExecutionResult(normalizedResult, serviceId);
@@ -295,9 +298,25 @@ export function CLIPanel({ serviceId }) {
                   )}
                 </h3>
                 {results.length > 0 && (
-                  <button className="clear-btn" onClick={clearResults}>
-                    Clear
-                  </button>
+                  <div className="results-header-actions">
+                    <button
+                      className="export-btn"
+                      onClick={() => exportRunsReport(results, { serviceId, title: 'Test Execution Evidence Report' })}
+                      title="Download a combined, printable evidence report (HTML → PDF) of all runs"
+                    >
+                      Export Report
+                    </button>
+                    <button
+                      className="export-btn"
+                      onClick={() => exportRunsAsJson(results)}
+                      title="Download all runs as a raw JSON bundle"
+                    >
+                      Export JSON
+                    </button>
+                    <button className="clear-btn" onClick={clearResults}>
+                      Clear
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -331,6 +350,26 @@ export function CLIPanel({ serviceId }) {
                         <span className="result-time">
                           {new Date(result.timestamp).toLocaleTimeString()}
                         </span>
+                        <div className="result-export">
+                          <button
+                            onClick={() => exportRunReport(result)}
+                            title="Download printable HTML report (inputs & outputs) — open and Save as PDF"
+                          >
+                            Report
+                          </button>
+                          <button
+                            onClick={() => exportRunAsJson(result)}
+                            title="Download this run as raw JSON"
+                          >
+                            JSON
+                          </button>
+                          <button
+                            onClick={() => exportRunAsMarkdown(result)}
+                            title="Download this run as a Markdown summary"
+                          >
+                            Markdown
+                          </button>
+                        </div>
                       </div>
                       <CLIResults result={result} />
                     </div>
