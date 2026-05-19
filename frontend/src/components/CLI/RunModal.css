@@ -1042,6 +1042,83 @@
   border-color: var(--color-accent);
 }
 
+/* ── Per-run executable + refined configuration cards ───────────────── */
+.configurations-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-quaternary);
+  font-variant-numeric: tabular-nums;
+}
+
+.config-body {
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+}
+
+.config-section-label {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: var(--space-2) var(--space-3) 0;
+}
+
+.config-executable {
+  padding: var(--space-1) var(--space-3) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* .config-variables is nested in .config-body now — drop its own chrome */
+.config-body .config-variables {
+  background: transparent;
+  border-top: none;
+}
+
+.config-body .config-executable + .config-variables {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.config-exe-tag {
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-family: var(--font-family-mono);
+  padding: 2px 9px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.config-exe-tag.set {
+  color: var(--color-success);
+  background: rgba(52, 199, 89, 0.12);
+}
+
+.config-exe-tag.missing {
+  color: var(--color-warning);
+  background: rgba(255, 149, 0, 0.14);
+}
+
+.config-empty-hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-quaternary);
+  line-height: var(--line-height-normal);
+}
+
+.run-modal .selected-executable .exe-glyph {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-success);
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
 .config-actions {
   margin-top: var(--space-2);
   display: flex;

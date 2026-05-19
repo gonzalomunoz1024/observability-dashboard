@@ -9,9 +9,13 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
   const { startJob } = useBackgroundJobs();
   const [executableFile, setExecutableFile] = useState(null);
   const [executableName, setExecutableName] = useState('');
+  // 'shared' = one executable for every run, 'per-config' = each run picks its own
+  const [executableMode, setExecutableMode] = useState('shared');
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
+  const configFileInputRefs = useRef({}); // configId -> <input type=file>
+
   const [activeStreamIds, setActiveStreamIds] = useState({}); // configId -> streamId
 
   // Configurations for runs with different variable values
@@ -103,8 +107,8 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
     const newId = `config-${Date.now()}`;
     let newVars = {};
 
+    const sourceConfig = cloneFrom ? configurations.find(c => c.id === cloneFrom) : null;
     if (cloneFrom) {
-      const sourceConfig = configurations.find(c => c.id === cloneFrom);
       newVars = { ...sourceConfig?.variables };
     } else {
       workflowVariables.forEach((v, index) => {
@@ -116,7 +120,9 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
     setConfigurations([...configurations, {
       id: newId,
       name: `Run ${configurations.length + 1}`,
-      variables: newVars
+      variables: newVars,
+      executableFile: sourceConfig?.executableFile || null,
+      executableName: sourceConfig?.executableName || ''
     }]);
     // Accordion behavior: collapse all others, expand only the new one
     setExpandedConfigs({ [newId]: true });
@@ -174,6 +180,30 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
       fileInputRef.current.value = '';
     }
   };
+
+  const setConfigExecutable = (configId, file) => {
+    setConfigurations(cfgs => cfgs.map(c =>
+      c.id === configId ? { ...c, executableFile: file, executableName: file.name } : c
+    ));
+  };
+
+  const clearConfigExecutable = (configId) => {
+    setConfigurations(cfgs => cfgs.map(c =>
+      c.id === configId ? { ...c, executableFile: null, executableName: '' } : c
+    ));
+    if (configFileInputRefs.current[configId]) {
+      configFileInputRefs.current[configId].value = '';
+    }
+  };
+
+  // Resolve which uploaded File a given config should run with
+  const getConfigFile = (config) =>
+    executableMode === 'per-config' ? config?.executableFile : executableFile;
+
+  // Run is allowed only when every config that will execute has an executable
+  const canRun = executableMode === 'shared'
+    ? !!executableFile
+    : configurations.length > 0 && configurations.every(c => !!c.executableFile);
 
   // Run a single configuration with streaming output
   const runConfiguration = async (config, test, executablePath) => {
@@ -333,8 +363,12 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
   };
 
   const handleRun = async () => {
-    if (!executableFile) {
-      setError('Please upload an executable');
+    if (!canRun) {
+      setError(
+        executableMode === 'per-config'
+          ? 'Every configuration needs an executable'
+          : 'Please upload an executable'
+      );
       return;
     }
 
@@ -358,10 +392,27 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
     setError(null);
     setCompletedConfigs([]);
     setConfigProgress({});
-    setStatusMessage('Uploading executable...');
+    setStatusMessage(
+      executableMode === 'per-config' && configsToRun.length > 1
+        ? 'Uploading executables...'
+        : 'Uploading executable...'
+    );
 
     try {
-      const uploadResult = await uploadExecutable(executableFile);
+      // Resolve an uploaded path for every config. In shared mode the same
+      // executable is uploaded once and reused; in per-config mode each
+      // configuration uploads its own.
+      const pathByConfig = {};
+      if (executableMode === 'shared') {
+        const uploadResult = await uploadExecutable(executableFile);
+        configsToRun.forEach(c => { pathByConfig[c.id] = uploadResult.path; });
+      } else {
+        await Promise.all(configsToRun.map(async c => {
+          const uploadResult = await uploadExecutable(c.executableFile);
+          pathByConfig[c.id] = uploadResult.path;
+        }));
+      }
+
       setStatusMessage(`Running ${configsToRun.length} configuration${configsToRun.length > 1 ? 's' : ''}...`);
 
       // Run all configurations for each test
@@ -372,7 +423,7 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
         // Execute configurations one after another
         results = [];
         for (const config of configsToRun) {
-          const result = await runConfiguration(config, test, uploadResult.path);
+          const result = await runConfiguration(config, test, pathByConfig[config.id]);
           results.push(result);
           // Update status message with progress
           setStatusMessage(`Running configuration ${results.length}/${configsToRun.length}...`);
@@ -380,7 +431,7 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
       } else {
         // Execute all configurations in parallel
         results = await Promise.all(
-          configsToRun.map(config => runConfiguration(config, test, uploadResult.path))
+          configsToRun.map(config => runConfiguration(config, test, pathByConfig[config.id]))
         );
       }
 
@@ -393,8 +444,12 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
   };
 
   const handleRunInBackground = async () => {
-    if (!executableFile) {
-      setError('Please upload an executable');
+    if (!canRun) {
+      setError(
+        executableMode === 'per-config'
+          ? 'Every configuration needs an executable'
+          : 'Please upload an executable'
+      );
       return;
     }
 
@@ -425,7 +480,7 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
 
       // Start background jobs for each configuration
       for (const config of configsToRun) {
-        await startJob(test, executableFile, serviceId, config);
+        await startJob(test, getConfigFile(config), serviceId, config);
       }
 
       // Close modal immediately - jobs run in background
@@ -506,75 +561,109 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
 
             <div className="form-group">
               <label>Executable</label>
-              <div className="executable-selector">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  style={{ display: 'none' }}
-                />
-                {executableName ? (
-                  <div className="selected-executable">
-                    <span className="file-name">{executableName}</span>
-                    <button type="button" className="clear-btn" onClick={clearExecutable}>
-                      x
-                    </button>
-                  </div>
-                ) : (
+              <div className="execution-mode-selector">
+                <div className="segmented-control">
                   <button
-                    type="button"
-                    className="upload-executable-btn"
-                    onClick={() => fileInputRef.current?.click()}
+                    className={`segment ${executableMode === 'shared' ? 'active' : ''}`}
+                    onClick={() => setExecutableMode('shared')}
                   >
-                    Upload Executable
+                    Shared
                   </button>
-                )}
+                  <button
+                    className={`segment ${executableMode === 'per-config' ? 'active' : ''}`}
+                    onClick={() => setExecutableMode('per-config')}
+                  >
+                    Per configuration
+                  </button>
+                </div>
+                <span className="execution-mode-hint">
+                  {executableMode === 'shared'
+                    ? 'One executable runs every configuration'
+                    : 'Each configuration runs its own executable'}
+                </span>
               </div>
+
+              {executableMode === 'shared' && (
+                <div className="executable-selector">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                  />
+                  {executableName ? (
+                    <div className="selected-executable">
+                      <span className="exe-glyph" aria-hidden="true">›_</span>
+                      <span className="file-name">{executableName}</span>
+                      <button
+                        type="button"
+                        className="clear-btn"
+                        onClick={clearExecutable}
+                        aria-label="Remove executable"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="upload-executable-btn"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Upload Executable
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Configurations Section */}
-            {hasVariables && (
-              <div className="configurations-section">
-                <div className="configurations-header">
-                  <label>Configurations</label>
-                </div>
+            <div className="configurations-section">
+              <div className="configurations-header">
+                <label>Configurations</label>
+                <span className="configurations-count">
+                  {configurations.length} run{configurations.length > 1 ? 's' : ''}
+                </span>
+              </div>
 
-                {/* Execution Mode Selector */}
-                {configurations.length > 1 && (
-                  <div className="execution-mode-selector">
-                    <div className="segmented-control">
-                      <button
-                        className={`segment ${executionMode === 'parallel' ? 'active' : ''}`}
-                        onClick={() => setExecutionMode('parallel')}
-                      >
-                        Parallel
-                      </button>
-                      <button
-                        className={`segment ${executionMode === 'sequential' ? 'active' : ''}`}
-                        onClick={() => setExecutionMode('sequential')}
-                      >
-                        Sequential
-                      </button>
-                    </div>
-                    <span className="execution-mode-hint">
-                      {executionMode === 'parallel'
-                        ? 'All configurations run simultaneously'
-                        : 'Configurations run one after another'}
-                    </span>
+              {/* Execution Mode Selector */}
+              {configurations.length > 1 && (
+                <div className="execution-mode-selector">
+                  <div className="segmented-control">
+                    <button
+                      className={`segment ${executionMode === 'parallel' ? 'active' : ''}`}
+                      onClick={() => setExecutionMode('parallel')}
+                    >
+                      Parallel
+                    </button>
+                    <button
+                      className={`segment ${executionMode === 'sequential' ? 'active' : ''}`}
+                      onClick={() => setExecutionMode('sequential')}
+                    >
+                      Sequential
+                    </button>
                   </div>
-                )}
-
-                <div className="configurations-list-header">
-                  <button className="add-config-btn" onClick={() => addConfiguration()}>
-                    + Add Configuration
-                  </button>
+                  <span className="execution-mode-hint">
+                    {executionMode === 'parallel'
+                      ? 'All configurations run simultaneously'
+                      : 'Configurations run one after another'}
+                  </span>
                 </div>
+              )}
 
-                <div className="configurations-list">
-                  {configurations.map((config, index) => (
+              <div className="configurations-list-header">
+                <button className="add-config-btn" onClick={() => addConfiguration()}>
+                  + Add Configuration
+                </button>
+              </div>
+
+              <div className="configurations-list">
+                {configurations.map((config, index) => {
+                  const isExpanded = expandedConfigs[config.id];
+                  return (
                     <div key={config.id} className="config-card">
                       <div className="config-header" onClick={() => toggleConfigExpand(config.id)}>
-                        <span className={`config-chevron ${expandedConfigs[config.id] ? 'expanded' : ''}`} />
+                        <span className={`config-chevron ${isExpanded ? 'expanded' : ''}`} />
                         <input
                           type="text"
                           className="config-name-input"
@@ -586,6 +675,14 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
                           onClick={(e) => e.stopPropagation()}
                           placeholder={`Run ${index + 1}`}
                         />
+                        {executableMode === 'per-config' && (
+                          <span
+                            className={`config-exe-tag ${config.executableName ? 'set' : 'missing'}`}
+                            title={config.executableName || 'No executable selected'}
+                          >
+                            {config.executableName || 'No executable'}
+                          </span>
+                        )}
                         {configurations.length > 1 && (
                           <button
                             className="remove-config-btn"
@@ -599,33 +696,80 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
                         )}
                       </div>
 
-                      {expandedConfigs[config.id] && (
-                        <div className="config-variables">
-                          {workflowVariables.map((v, varIndex) => {
-                            const varId = getVarId(v, varIndex);
-                            return (
-                              <div key={varIndex} className="config-var-row">
-                                <label className="config-var-label" title={v.description}>
-                                  {v.name || `Variable ${varIndex + 1}`}:
-                                </label>
-                                <input
-                                  type="text"
-                                  className="config-var-input"
-                                  value={config.variables[varId] || ''}
-                                  onChange={(e) => updateConfigVariable(config.id, varId, e.target.value)}
-                                  placeholder={v.defaultValue || ''}
-                                />
-                              </div>
-                            );
-                          })}
+                      {isExpanded && (
+                        <div className="config-body">
+                          {executableMode === 'per-config' && (
+                            <div className="config-executable">
+                              <label className="config-section-label">Executable</label>
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                ref={(el) => { configFileInputRefs.current[config.id] = el; }}
+                                onChange={(e) => {
+                                  const f = e.target.files[0];
+                                  if (f) setConfigExecutable(config.id, f);
+                                }}
+                              />
+                              {config.executableName ? (
+                                <div className="selected-executable">
+                                  <span className="exe-glyph" aria-hidden="true">›_</span>
+                                  <span className="file-name">{config.executableName}</span>
+                                  <button
+                                    type="button"
+                                    className="clear-btn"
+                                    onClick={() => clearConfigExecutable(config.id)}
+                                    aria-label="Remove executable"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="upload-executable-btn"
+                                  onClick={() => configFileInputRefs.current[config.id]?.click()}
+                                >
+                                  Upload Executable
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {hasVariables ? (
+                            <div className="config-variables">
+                              <label className="config-section-label">Variables</label>
+                              {workflowVariables.map((v, varIndex) => {
+                                const varId = getVarId(v, varIndex);
+                                return (
+                                  <div key={varIndex} className="config-var-row">
+                                    <label className="config-var-label" title={v.description}>
+                                      {v.name || `Variable ${varIndex + 1}`}:
+                                    </label>
+                                    <input
+                                      type="text"
+                                      className="config-var-input"
+                                      value={config.variables[varId] || ''}
+                                      onChange={(e) => updateConfigVariable(config.id, varId, e.target.value)}
+                                      placeholder={v.defaultValue || ''}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            executableMode !== 'per-config' && (
+                              <p className="config-empty-hint">
+                                No variables for this suite — this run uses the shared executable.
+                              </p>
+                            )
+                          )}
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-
+                  );
+                })}
               </div>
-            )}
+            </div>
 
             {error && <div className="run-modal-error">{error}</div>}
 
@@ -634,7 +778,7 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
                 Cancel
               </button>
               <div className="run-dropdown">
-                <button className="run-btn" onClick={handleRun} disabled={!executableFile}>
+                <button className="run-btn" onClick={handleRun} disabled={!canRun}>
                   {configurations.length > 1
                     ? `Run ${configurations.length} Configurations`
                     : 'Run'}
@@ -658,7 +802,7 @@ export function RunModal({ tests = [], onClose, onResult, serviceId }) {
                       setTimeout(() => document.addEventListener('click', closeMenu), 0);
                     }
                   }}
-                  disabled={!executableFile}
+                  disabled={!canRun}
                 >
                   <span className="dropdown-chevron" />
                 </button>
