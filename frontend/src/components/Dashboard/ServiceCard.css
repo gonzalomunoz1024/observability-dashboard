@@ -137,6 +137,20 @@
   transition: all var(--transition-fast);
 }
 
+.edit-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-fg-tertiary);
+}
+
+.edit-btn:hover {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .check-btn {
   color: var(--color-fg-secondary);
 }

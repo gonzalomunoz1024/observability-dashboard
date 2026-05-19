@@ -7,7 +7,7 @@ import './ServiceCard.css';
  * ServiceCard - Health status detail card
  * Shows service metrics and actions
  */
-export const ServiceCard = memo(function ServiceCard({ service, status, onCheckNow }) {
+export const ServiceCard = memo(function ServiceCard({ service, status, onCheckNow, onEdit }) {
   const dispatch = useServicesDispatch();
 
   const handleDelete = useCallback(() => {
@@ -52,6 +52,24 @@ export const ServiceCard = memo(function ServiceCard({ service, status, onCheckN
       )}
 
       <div className="card-actions">
+        {onEdit && (
+          <button
+            className="action-btn edit-btn"
+            onClick={onEdit}
+            title="Edit service"
+            aria-label="Edit service"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path
+                d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
         <button className="action-btn check-btn" onClick={onCheckNow}>
           Check Now
         </button>

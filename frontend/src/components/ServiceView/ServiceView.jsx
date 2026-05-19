@@ -63,29 +63,9 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
             {isRest ? 'API' : 'CLI'}
           </span>
         </div>
-        <div className="header-actions">
-          {isRest && (
-            <button
-              className="edit-service-btn"
-              onClick={() => setEditing(true)}
-              title="Edit service"
-              aria-label="Edit service"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          )}
-          <button className="delete-service-btn" onClick={handleDelete}>
-            Delete
-          </button>
-        </div>
+        <button className="delete-service-btn" onClick={handleDelete}>
+          Delete
+        </button>
       </div>
 
       <div className="tabs">
@@ -107,6 +87,7 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
               service={service}
               status={status}
               onCheckNow={() => checkService(service)}
+              onEdit={() => setEditing(true)}
             />
           </div>
         )}
