@@ -6,9 +6,18 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid');
+const { Agent } = require('undici');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// The dashboard proxies HTTPS requests to user-supplied targets (their own
+// services, often using internal CAs or self-signed certs). We deliberately
+// skip certificate-chain verification on those proxied fetches so they don't
+// fail with "TLS error - unable to verify certificate chain". This dispatcher
+// is only attached to the user-target fetches (health-check route +
+// runHttpStep); all other fetch usage in this process is unaffected.
+const insecureAgent = new Agent({ connect: { rejectUnauthorized: false } });
 
 // Middleware
 app.use(cors());
@@ -340,6 +349,8 @@ async function runHttpStep(step, variables, onOutput) {
       method,
       headers,
       signal: controller.signal,
+      // Don't reject user-target certs (internal / self-signed are common)
+      dispatcher: insecureAgent,
     };
     if (body && method !== 'GET') {
       fetchOptions.body = body;
@@ -733,6 +744,8 @@ app.post('/api/health-check', async (req, res) => {
     const response = await fetch(url, {
       method,
       signal: controller.signal,
+      // Don't reject user-target certs (internal / self-signed are common)
+      dispatcher: insecureAgent,
     });
 
     clearTimeout(timeoutId);
