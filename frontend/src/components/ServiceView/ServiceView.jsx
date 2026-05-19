@@ -5,6 +5,7 @@ import { SyntheticPanel } from '../Synthetic/SyntheticPanel';
 import { LoadTestPanel } from '../LoadTest/LoadTestPanel';
 import { CLIPanel } from '../CLI/CLIPanel';
 import { AlertingPanel } from '../Alerting/AlertingPanel';
+import { EndpointForm } from '../Config/EndpointForm';
 import { useHealthCheck } from '../../hooks/useHealthCheck';
 import './ServiceView.css';
 
@@ -23,6 +24,7 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
   const [activeTab, setActiveTab] = useState(
     service?.type === 'cli' ? 'cli' : 'health'
   );
+  const [editing, setEditing] = useState(false);
 
   const handleDelete = useCallback(() => {
     if (window.confirm(`Delete "${service?.name}"?`)) {
@@ -61,9 +63,29 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
             {isRest ? 'API' : 'CLI'}
           </span>
         </div>
-        <button className="delete-service-btn" onClick={handleDelete}>
-          Delete
-        </button>
+        <div className="header-actions">
+          {isRest && (
+            <button
+              className="edit-service-btn"
+              onClick={() => setEditing(true)}
+              title="Edit service"
+              aria-label="Edit service"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M11.5 2.5a1.414 1.414 0 0 1 2 2L5 13l-3 1 1-3 8.5-8.5z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
+          <button className="delete-service-btn" onClick={handleDelete}>
+            Delete
+          </button>
+        </div>
       </div>
 
       <div className="tabs">
@@ -105,6 +127,13 @@ export const ServiceView = memo(function ServiceView({ serviceId }) {
           <CLIPanel serviceId={serviceId} />
         )}
       </div>
+
+      {editing && (
+        <EndpointForm
+          editService={service}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </div>
   );
 });
