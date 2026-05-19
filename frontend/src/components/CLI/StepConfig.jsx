@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import './StepConfig.css';
 
-// Vendor/tooling CLIs resolved from PATH on the runner (not the uploaded binary)
-const VENDOR_CLIS = [
+// Auxiliary/tooling CLIs resolved from PATH on the runner (not the uploaded binary)
+const AUX_CLIS = [
   { value: 'oc', label: 'OpenShift (oc)' },
   { value: 'kubectl', label: 'Kubernetes (kubectl)' },
   { value: 'terraform', label: 'Terraform' },
@@ -59,7 +59,7 @@ const InfoTip = ({ text, example }) => {
   );
 };
 
-export function StepConfig({ step, index, previousStepIds = [], availableVars = [], varToStep = {}, isExpanded = true, onToggleExpand, onUpdate, onRemove, canRemove }) {
+export function StepConfig({ step, index, previousStepIds = [], availableVars = [], varToStep = {}, isExpanded = true, onToggleExpand, onUpdate, onRemove, canRemove, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver }) {
   const [showOutputsHelp, setShowOutputsHelp] = useState(false);
   const [showAssertionsHelp, setShowAssertionsHelp] = useState(false);
 
@@ -102,7 +102,7 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
     if (stepType === 'http') {
       return step.http?.url ? <code>{step.http.method || 'GET'} {step.http.url}</code> : null;
     }
-    if (stepType === 'vendor') {
+    if (stepType === 'auxiliary') {
       return (step.executable || step.args)
         ? <code>{[step.executable, step.args].filter(Boolean).join(' ')}</code>
         : null;
@@ -110,14 +110,41 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
     return step.args ? <code>{step.args}</code> : null;
   };
 
-  const typeClass = stepType === 'http' ? 'http-step' : stepType === 'vendor' ? 'vendor-step' : '';
+  const typeClass = stepType === 'http' ? 'http-step' : stepType === 'auxiliary' ? 'auxiliary-step' : '';
 
   return (
-    <div className={`step-config ${typeClass}`}>
-      <div className="step-header" onClick={onToggleExpand}>
+    <div className={`step-config ${typeClass} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}>
+      <div
+        className="step-header"
+        onClick={onToggleExpand}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          // Firefox requires data to be set for dragging to start
+          e.dataTransfer.setData('text/plain', String(index));
+          onDragStart?.(index);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          onDragOver?.(index);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          onDrop?.(index);
+        }}
+        onDragEnd={() => onDragEnd?.()}
+      >
+        <span
+          className="step-drag-handle"
+          title="Drag to reorder"
+          onClick={(e) => e.stopPropagation()}
+        >
+          ⠿
+        </span>
         <span className="step-toggle">{isExpanded ? '▼' : '▶'}</span>
         <span className={`step-type-badge ${stepType}`}>
-          {stepType === 'http' ? 'HTTP' : stepType === 'vendor' ? 'VND' : 'CMD'}
+          {stepType === 'http' ? 'HTTP' : stepType === 'auxiliary' ? 'AUX' : 'CMD'}
         </span>
         <span className="step-title">
           {step.name || step.id || `Step ${index + 1}`}
@@ -162,14 +189,14 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
             <div className="form-group flex-1">
               <label>
                 Step Type
-                <InfoTip text="Command runs your uploaded executable. Vendor CLI runs a tool from PATH (oc, terraform, docker…). HTTP makes API requests." />
+                <InfoTip text="Command runs your uploaded executable. Auxiliary CLI runs an external tool from PATH (oc, terraform, docker…). HTTP makes API requests." />
               </label>
               <select
                 value={stepType}
                 onChange={(e) => {
                   const t = e.target.value;
-                  if (t === 'vendor') {
-                    handleMultiChange({ type: 'vendor', executable: step.executable || 'oc' });
+                  if (t === 'auxiliary') {
+                    handleMultiChange({ type: 'auxiliary', executable: step.executable || 'oc' });
                   } else {
                     handleChange('type', t);
                   }
@@ -177,23 +204,23 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                 className="step-type-select"
               >
                 <option value="command">Command</option>
-                <option value="vendor">Vendor CLI</option>
+                <option value="auxiliary">Auxiliary CLI</option>
                 <option value="http">HTTP Request</option>
               </select>
             </div>
           </div>
 
-          {/* Command + Vendor CLI Type Fields */}
-          {(stepType === 'command' || stepType === 'vendor') && (
+          {/* Command + Auxiliary CLI Type Fields */}
+          {(stepType === 'command' || stepType === 'auxiliary') && (
             <>
-              {stepType === 'vendor' && (() => {
-                const isKnown = VENDOR_CLIS.some(c => c.value === step.executable);
+              {stepType === 'auxiliary' && (() => {
+                const isKnown = AUX_CLIS.some(c => c.value === step.executable);
                 const isCustom = !isKnown;
                 return (
                   <div className="form-row">
                     <div className="form-group flex-1">
                       <label>
-                        Vendor CLI
+                        Auxiliary CLI
                         <InfoTip
                           text="A tool resolved from PATH on the runner — not the uploaded executable. Runs in order, in between your other steps."
                           example="oc, terraform, docker"
@@ -207,7 +234,7 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                           handleChange('executable', v === 'custom' ? '' : v);
                         }}
                       >
-                        {VENDOR_CLIS.map(c => (
+                        {AUX_CLIS.map(c => (
                           <option key={c.value} value={c.value}>{c.label}</option>
                         ))}
                         <option value="custom">Custom…</option>
@@ -223,7 +250,7 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
                           type="text"
                           value={step.executable || ''}
                           onChange={(e) => handleChange('executable', e.target.value)}
-                          placeholder="vendor-cli"
+                          placeholder="auxiliary-cli"
                         />
                       </div>
                     )}

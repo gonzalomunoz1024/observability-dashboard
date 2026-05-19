@@ -131,6 +131,27 @@
   border-left: 3px solid var(--color-success);
 }
 
+.graph-node.auxiliary {
+  border-left: 3px solid var(--color-warning);
+}
+
+.graph-node.draggable {
+  cursor: grab;
+}
+
+.graph-node.draggable:active {
+  cursor: grabbing;
+}
+
+.graph-node.dragging {
+  opacity: 0.5;
+}
+
+.graph-node.drag-over {
+  border-color: var(--color-accent);
+  box-shadow: 0 -2px 0 0 var(--color-accent) inset, 0 0 0 1px var(--color-accent);
+}
+
 .node-index {
   width: 24px;
   height: 24px;
@@ -174,6 +195,11 @@
 .node-type.http {
   background: rgba(52, 199, 89, 0.15);
   color: var(--color-success);
+}
+
+.node-type.auxiliary {
+  background: rgba(255, 149, 0, 0.16);
+  color: var(--color-warning);
 }
 
 .node-name {

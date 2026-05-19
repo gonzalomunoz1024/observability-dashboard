@@ -8,7 +8,7 @@ const defaultStep = {
   id: '',
   name: '',
   type: 'command',
-  executable: '', // vendor CLI name (only used by 'vendor' steps)
+  executable: '', // external CLI name (only used by 'auxiliary' steps)
   args: '',
   timeout: 30000,
   dependsOn: '',
@@ -32,24 +32,8 @@ const defaultStep = {
   },
 };
 
-// Back-compat: older suites stored a separate `setupCommands` array.
-// Setup commands are now first-class "vendor" steps, so convert any
-// legacy entries into vendor steps prepended to the step list.
-function migrateSteps(workflow) {
-  const baseSteps = Array.isArray(workflow.steps) ? workflow.steps : [];
-  const legacy = Array.isArray(workflow.setupCommands) ? workflow.setupCommands : [];
-  const setupSteps = legacy.map((cmd, i) => ({
-    ...defaultStep,
-    id: `Setup ${i + 1}`,
-    name: `${cmd.executable || 'setup'} ${cmd.args || ''}`.trim() || `Setup ${i + 1}`,
-    type: 'vendor',
-    executable: cmd.executable || '',
-    args: cmd.args || '',
-    stdinInputs: cmd.stdinInputs || '',
-    timeout: cmd.timeout || 60000,
-  }));
-  const combined = [...setupSteps, ...baseSteps];
-  return combined.length > 0 ? combined : [{ ...defaultStep, id: 'Step 1' }];
+function initialSteps(workflow) {
+  return workflow.steps?.length ? workflow.steps : [{ ...defaultStep, id: 'Step 1' }];
 }
 
 export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveComplete, initialWorkflow, onCancelEdit }) {
@@ -64,6 +48,8 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
   const [showGraph, setShowGraph] = useState(false);
   const [showVariables, setShowVariables] = useState(true);
   const [expandedStepIndex, setExpandedStepIndex] = useState(0);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   useEffect(() => {
     setSavedWorkflows(getSavedWorkflows(serviceId));
@@ -76,7 +62,7 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
       setWorkflowName(initialWorkflow.name);
       setVariables(initialWorkflow.variables || []);
       setEnvVars(initialWorkflow.envVars || '');
-      setSteps(migrateSteps(initialWorkflow));
+      setSteps(initialSteps(initialWorkflow));
     }
   }, [initialWorkflow]);
 
@@ -108,7 +94,7 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
     setWorkflowName(workflow.name);
     setVariables(workflow.variables || []);
     setEnvVars(workflow.envVars || '');
-    setSteps(migrateSteps(workflow));
+    setSteps(initialSteps(workflow));
     setShowSaved(false);
   };
 
@@ -152,6 +138,32 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
     const newSteps = [...steps];
     newSteps[index] = updatedStep;
     setSteps(newSteps);
+  };
+
+  // Drag-to-reorder steps (reflected everywhere, incl. the Data Flow graph
+  // and execution order, since all derive from this steps array)
+  const reorderSteps = (from, to) => {
+    if (from == null || to == null || from === to) return;
+    setSteps((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setExpandedStepIndex(to);
+  };
+
+  const handleStepDragStart = (i) => setDragIndex(i);
+  const handleStepDragOver = (i) =>
+    setDragOverIndex((prev) => (prev === i ? prev : i));
+  const handleStepDrop = (i) => {
+    reorderSteps(dragIndex, i);
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+  const handleStepDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
   };
 
   return (
@@ -356,6 +368,12 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
                       onUpdate={(updated) => updateStep(index, updated)}
                       onRemove={() => removeStep(index)}
                       canRemove={steps.length > 1}
+                      isDragging={dragIndex === index}
+                      isDragOver={dragOverIndex === index && dragIndex !== index}
+                      onDragStart={handleStepDragStart}
+                      onDragOver={handleStepDragOver}
+                      onDrop={handleStepDrop}
+                      onDragEnd={handleStepDragEnd}
                     />
                   );
                 });
@@ -366,7 +384,7 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
             </div>
             {showGraph && (
               <div className="steps-graph">
-                <WorkflowGraph steps={steps} />
+                <WorkflowGraph steps={steps} onReorder={reorderSteps} />
               </div>
             )}
           </div>

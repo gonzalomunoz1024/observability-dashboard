@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import './WorkflowGraph.css';
 
 // Generate consistent color for a variable name (no yellows, good contrast)
@@ -14,7 +15,10 @@ const getVarColor = (varName) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-export function WorkflowGraph({ steps }) {
+export function WorkflowGraph({ steps, onReorder }) {
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+  const canDrag = typeof onReorder === 'function';
   // Parse captured variables from capture array
   const getCapturedVars = (step) => {
     const vars = [];
@@ -136,12 +140,36 @@ export function WorkflowGraph({ steps }) {
                 )}
 
                 {/* Step card */}
-                <div className={`graph-node ${stepType}`}>
+                <div
+                  className={`graph-node ${stepType}${canDrag ? ' draggable' : ''}${dragIndex === index ? ' dragging' : ''}${overIndex === index && dragIndex !== index ? ' drag-over' : ''}`}
+                  draggable={canDrag}
+                  onDragStart={canDrag ? (e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', String(index));
+                    setDragIndex(index);
+                  } : undefined}
+                  onDragOver={canDrag ? (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    setOverIndex(index);
+                  } : undefined}
+                  onDrop={canDrag ? (e) => {
+                    e.preventDefault();
+                    if (dragIndex !== null) onReorder(dragIndex, index);
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  } : undefined}
+                  onDragEnd={canDrag ? () => {
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  } : undefined}
+                  title={canDrag ? 'Drag to reorder' : undefined}
+                >
                   <div className="node-index">{index + 1}</div>
                   <div className="node-content">
                     <div className="node-header">
                       <span className={`node-type ${stepType}`}>
-                        {stepType === 'http' ? 'HTTP' : 'CMD'}
+                        {stepType === 'http' ? 'HTTP' : stepType === 'auxiliary' ? 'AUX' : 'CMD'}
                       </span>
                       <span className="node-name">
                         {step.name || step.id || `Step ${index + 1}`}
@@ -151,7 +179,9 @@ export function WorkflowGraph({ steps }) {
                       <span className="node-target">
                         {stepType === 'http'
                           ? `${step.http?.method || 'GET'} ${step.http?.url || ''}`
-                          : step.args || 'No arguments'}
+                          : stepType === 'auxiliary'
+                            ? `${[step.executable, step.args].filter(Boolean).join(' ') || 'No command'}`
+                            : step.args || 'No arguments'}
                       </span>
                     </div>
 

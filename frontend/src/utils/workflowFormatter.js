@@ -67,19 +67,7 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
       )
     : undefined;
 
-  // Back-compat: legacy `setupCommands` become vendor steps run first
-  const legacySetupSteps = (workflow.setupCommands || []).map((cmd, i) => ({
-    id: `Setup ${i + 1}`,
-    name: `${cmd.executable || 'setup'} ${cmd.args || ''}`.trim() || `Setup ${i + 1}`,
-    type: 'vendor',
-    executable: cmd.executable || '',
-    args: cmd.args || '',
-    stdinInputs: cmd.stdinInputs || undefined,
-    timeout: cmd.timeout || 60000,
-    expectations: { exitCode: 0 },
-  }));
-
-  const allSteps = [...legacySetupSteps, ...(workflow.steps || [])];
+  const allSteps = workflow.steps || [];
 
   // Build a map of variable -> step that captures it
   const variableToStep = {};
@@ -134,12 +122,13 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
     steps: allSteps.map((step) => {
       const autoDeps = getAutoDependencies(step);
 
-      // Vendor CLI steps run a tool resolved from PATH, not the uploaded binary
-      if (step.type === 'vendor') {
+      // Auxiliary CLI steps run an external tool resolved from PATH,
+      // not the uploaded binary
+      if (step.type === 'auxiliary') {
         return {
           id: step.id,
           name: step.name || step.id,
-          type: 'vendor',
+          type: 'auxiliary',
           executable: step.executable || '',
           args: step.args || '',
           timeout: step.timeout,

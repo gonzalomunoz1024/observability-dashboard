@@ -463,24 +463,6 @@ function parseEnvVars(envVarsString) {
 }
 
 // SSE endpoint for streaming workflow execution
-// Back-compat: legacy workflows sent a separate `setupCommands` array.
-// Setup/vendor commands are now first-class 'vendor' steps; fold any
-// legacy entries into the front of the step list so old payloads still run.
-function buildSteps(workflow) {
-  const legacy = Array.isArray(workflow.setupCommands) ? workflow.setupCommands : [];
-  const setupSteps = legacy.map((cmd, i) => ({
-    id: cmd.id || `Setup ${i + 1}`,
-    name: cmd.name || `${cmd.executable || 'setup'} ${cmd.args || ''}`.trim() || `Setup ${i + 1}`,
-    type: 'vendor',
-    executable: cmd.executable,
-    args: Array.isArray(cmd.args) ? cmd.args.join(' ') : (cmd.args || ''),
-    stdinInputs: cmd.stdinInputs,
-    timeout: cmd.timeout || 60000,
-    continueOnError: cmd.continueOnError,
-  }));
-  return [...setupSteps, ...(workflow.steps || [])];
-}
-
 app.post('/api/cli/workflow/stream', async (req, res) => {
   const workflow = req.body;
   const streamId = uuidv4();
@@ -507,7 +489,7 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
     const executablePath = workflow.executable;
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-workflow-'));
     const variables = { workDir, ...(workflow.variables || {}) };
-    const steps = buildSteps(workflow);
+    const steps = workflow.steps || [];
     const results = [];
 
     sendEvent('start', { workDir, totalSteps: steps.length });
@@ -525,8 +507,8 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
           (output) => sendEvent('output', { stepId: step.id, ...output })
         );
       } else {
-        // Command step (uploaded executable) or vendor CLI step (from PATH)
-        const bin = step.type === 'vendor' ? step.executable : executablePath;
+        // Command step (uploaded executable) or auxiliary CLI step (from PATH)
+        const bin = step.type === 'auxiliary' ? step.executable : executablePath;
         result = await runCommandStep(
           step,
           bin,
@@ -606,7 +588,7 @@ app.post('/api/cli/workflow', async (req, res) => {
     const executablePath = workflow.executable;
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-workflow-'));
     const variables = { workDir, ...(workflow.variables || {}) };
-    const steps = buildSteps(workflow);
+    const steps = workflow.steps || [];
     const results = [];
 
     // Run workflow steps
@@ -620,8 +602,8 @@ app.post('/api/cli/workflow', async (req, res) => {
           () => {} // No streaming
         );
       } else {
-        // Command step (uploaded executable) or vendor CLI step (from PATH)
-        const bin = step.type === 'vendor' ? step.executable : executablePath;
+        // Command step (uploaded executable) or auxiliary CLI step (from PATH)
+        const bin = step.type === 'auxiliary' ? step.executable : executablePath;
         result = await runCommandStep(
           step,
           bin,
