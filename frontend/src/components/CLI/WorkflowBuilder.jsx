@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { StepConfig } from './StepConfig';
 import { WorkflowGraph } from './WorkflowGraph';
-import { SetupCommandsSection } from './SetupCommand';
 import { getSavedWorkflows, saveWorkflow, deleteWorkflow } from '../../utils/workflowStorage';
 import './WorkflowBuilder.css';
 
@@ -9,6 +8,7 @@ const defaultStep = {
   id: '',
   name: '',
   type: 'command',
+  executable: '', // vendor CLI name (only used by 'vendor' steps)
   args: '',
   timeout: 30000,
   dependsOn: '',
@@ -32,12 +32,31 @@ const defaultStep = {
   },
 };
 
+// Back-compat: older suites stored a separate `setupCommands` array.
+// Setup commands are now first-class "vendor" steps, so convert any
+// legacy entries into vendor steps prepended to the step list.
+function migrateSteps(workflow) {
+  const baseSteps = Array.isArray(workflow.steps) ? workflow.steps : [];
+  const legacy = Array.isArray(workflow.setupCommands) ? workflow.setupCommands : [];
+  const setupSteps = legacy.map((cmd, i) => ({
+    ...defaultStep,
+    id: `Setup ${i + 1}`,
+    name: `${cmd.executable || 'setup'} ${cmd.args || ''}`.trim() || `Setup ${i + 1}`,
+    type: 'vendor',
+    executable: cmd.executable || '',
+    args: cmd.args || '',
+    stdinInputs: cmd.stdinInputs || '',
+    timeout: cmd.timeout || 60000,
+  }));
+  const combined = [...setupSteps, ...baseSteps];
+  return combined.length > 0 ? combined : [{ ...defaultStep, id: 'Step 1' }];
+}
+
 export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveComplete, initialWorkflow, onCancelEdit }) {
   const [workflowId, setWorkflowId] = useState(null);
   const [workflowName, setWorkflowName] = useState('');
   const [variables, setVariables] = useState([]); // Global variables with defaults
   const [envVars, setEnvVars] = useState('');
-  const [setupCommands, setSetupCommands] = useState([]);
   const [steps, setSteps] = useState([{ ...defaultStep, id: 'Step 1' }]);
   const [error, setError] = useState(null);
   const [savedWorkflows, setSavedWorkflows] = useState([]);
@@ -57,8 +76,7 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
       setWorkflowName(initialWorkflow.name);
       setVariables(initialWorkflow.variables || []);
       setEnvVars(initialWorkflow.envVars || '');
-      setSetupCommands(initialWorkflow.setupCommands || []);
-      setSteps(initialWorkflow.steps || [{ ...defaultStep, id: 'Step 1' }]);
+      setSteps(migrateSteps(initialWorkflow));
     }
   }, [initialWorkflow]);
 
@@ -72,7 +90,6 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
       name: workflowName,
       variables,
       envVars,
-      setupCommands,
       steps,
     }, serviceId);
     setWorkflowId(saved.id);
@@ -91,8 +108,7 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
     setWorkflowName(workflow.name);
     setVariables(workflow.variables || []);
     setEnvVars(workflow.envVars || '');
-    setSetupCommands(workflow.setupCommands || []);
-    setSteps(workflow.steps || [{ ...defaultStep, id: 'Step 1' }]);
+    setSteps(migrateSteps(workflow));
     setShowSaved(false);
   };
 
@@ -270,10 +286,6 @@ export function WorkflowBuilder({ serviceId, onSave: onSaveCallback, onSaveCompl
             />
           </div>
 
-          <SetupCommandsSection
-            commands={setupCommands}
-            onChange={setSetupCommands}
-          />
         </div>
 
         <div className="steps-section">

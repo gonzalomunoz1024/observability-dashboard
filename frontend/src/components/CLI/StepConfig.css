@@ -49,8 +49,17 @@
   color: var(--color-success);
 }
 
+.step-type-badge.vendor {
+  background: rgba(255, 149, 0, 0.16);
+  color: var(--color-warning);
+}
+
 .step-config.http-step {
   border-color: rgba(52, 199, 89, 0.3);
+}
+
+.step-config.vendor-step {
+  border-color: rgba(255, 149, 0, 0.3);
 }
 
 .step-title {

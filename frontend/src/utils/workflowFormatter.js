@@ -67,21 +67,23 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
       )
     : undefined;
 
-  // Format setup commands (vendor CLI logins, etc.)
-  const setupCommands = workflow.setupCommands?.length > 0
-    ? workflow.setupCommands.map((cmd, i) => ({
-        id: `setup-${i + 1}`,
-        name: `${cmd.executable} ${cmd.args || ''}`.trim(),
-        executable: cmd.executable,
-        args: cmd.args ? cmd.args.split(' ').filter(Boolean) : [],
-        stdinInputs: cmd.stdinInputs ? cmd.stdinInputs.split('\\n').filter(Boolean) : undefined,
-        timeout: cmd.timeout || 60000,
-      }))
-    : undefined;
+  // Back-compat: legacy `setupCommands` become vendor steps run first
+  const legacySetupSteps = (workflow.setupCommands || []).map((cmd, i) => ({
+    id: `Setup ${i + 1}`,
+    name: `${cmd.executable || 'setup'} ${cmd.args || ''}`.trim() || `Setup ${i + 1}`,
+    type: 'vendor',
+    executable: cmd.executable || '',
+    args: cmd.args || '',
+    stdinInputs: cmd.stdinInputs || undefined,
+    timeout: cmd.timeout || 60000,
+    expectations: { exitCode: 0 },
+  }));
+
+  const allSteps = [...legacySetupSteps, ...(workflow.steps || [])];
 
   // Build a map of variable -> step that captures it
   const variableToStep = {};
-  workflow.steps.forEach((step) => {
+  allSteps.forEach((step) => {
     if (Array.isArray(step.capture)) {
       step.capture.forEach(c => {
         if (c.varName) variableToStep[c.varName] = step.id;
@@ -129,8 +131,26 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
     name: workflow.name,
     executable,  // Server expects this at workflow level
     env,
-    steps: workflow.steps.map((step) => {
+    steps: allSteps.map((step) => {
       const autoDeps = getAutoDependencies(step);
+
+      // Vendor CLI steps run a tool resolved from PATH, not the uploaded binary
+      if (step.type === 'vendor') {
+        return {
+          id: step.id,
+          name: step.name || step.id,
+          type: 'vendor',
+          executable: step.executable || '',
+          args: step.args || '',
+          timeout: step.timeout,
+          dependsOn: autoDeps,
+          stdinInputs: step.stdinInputs || undefined,
+          stdinDelay: step.stdinDelay,
+          expectations: buildExpectations(step.expectations),
+          capture: step.capture ? parseCapture(step.capture) : undefined,
+          artifacts: step.artifacts ? parseArtifacts(step.artifacts) : undefined,
+        };
+      }
 
       // HTTP steps
       if (step.type === 'http') {
@@ -176,10 +196,6 @@ export function formatWorkflowForExecution(workflow, executable, runtimeVariable
       };
     }),
   };
-
-  if (setupCommands && setupCommands.length > 0) {
-    result.setupCommands = setupCommands;
-  }
 
   // Apply variable substitution to all string fields
   const substituted = substituteInObject(result, variables);

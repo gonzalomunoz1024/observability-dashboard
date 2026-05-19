@@ -463,6 +463,24 @@ function parseEnvVars(envVarsString) {
 }
 
 // SSE endpoint for streaming workflow execution
+// Back-compat: legacy workflows sent a separate `setupCommands` array.
+// Setup/vendor commands are now first-class 'vendor' steps; fold any
+// legacy entries into the front of the step list so old payloads still run.
+function buildSteps(workflow) {
+  const legacy = Array.isArray(workflow.setupCommands) ? workflow.setupCommands : [];
+  const setupSteps = legacy.map((cmd, i) => ({
+    id: cmd.id || `Setup ${i + 1}`,
+    name: cmd.name || `${cmd.executable || 'setup'} ${cmd.args || ''}`.trim() || `Setup ${i + 1}`,
+    type: 'vendor',
+    executable: cmd.executable,
+    args: Array.isArray(cmd.args) ? cmd.args.join(' ') : (cmd.args || ''),
+    stdinInputs: cmd.stdinInputs,
+    timeout: cmd.timeout || 60000,
+    continueOnError: cmd.continueOnError,
+  }));
+  return [...setupSteps, ...(workflow.steps || [])];
+}
+
 app.post('/api/cli/workflow/stream', async (req, res) => {
   const workflow = req.body;
   const streamId = uuidv4();
@@ -489,27 +507,10 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
     const executablePath = workflow.executable;
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-workflow-'));
     const variables = { workDir, ...(workflow.variables || {}) };
-    const steps = workflow.steps || [];
+    const steps = buildSteps(workflow);
     const results = [];
 
     sendEvent('start', { workDir, totalSteps: steps.length });
-
-    // Run setup commands
-    if (workflow.setupCommands?.length > 0) {
-      sendEvent('setup', { message: 'Running setup commands...' });
-      for (const cmd of workflow.setupCommands) {
-        const setupResult = await runCommandStep(
-          { id: 'setup', name: cmd.name || 'Setup', args: cmd.command, timeout: cmd.timeout || 60000 },
-          '/bin/sh',
-          workDir,
-          variables,
-          (output) => sendEvent('output', { stepId: 'setup', ...output })
-        );
-        if (!setupResult.passed && !cmd.continueOnError) {
-          throw new Error(`Setup command failed: ${cmd.command}`);
-        }
-      }
-    }
 
     // Run workflow steps
     for (const step of steps) {
@@ -524,10 +525,11 @@ app.post('/api/cli/workflow/stream', async (req, res) => {
           (output) => sendEvent('output', { stepId: step.id, ...output })
         );
       } else {
-        // Command step
+        // Command step (uploaded executable) or vendor CLI step (from PATH)
+        const bin = step.type === 'vendor' ? step.executable : executablePath;
         result = await runCommandStep(
           step,
-          executablePath,
+          bin,
           workDir,
           variables,
           (output) => sendEvent('output', { stepId: step.id, ...output }),
@@ -604,24 +606,8 @@ app.post('/api/cli/workflow', async (req, res) => {
     const executablePath = workflow.executable;
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cli-workflow-'));
     const variables = { workDir, ...(workflow.variables || {}) };
-    const steps = workflow.steps || [];
+    const steps = buildSteps(workflow);
     const results = [];
-
-    // Run setup commands
-    if (workflow.setupCommands?.length > 0) {
-      for (const cmd of workflow.setupCommands) {
-        const setupResult = await runCommandStep(
-          { id: 'setup', name: cmd.name || 'Setup', args: cmd.command, timeout: cmd.timeout || 60000 },
-          '/bin/sh',
-          workDir,
-          variables,
-          () => {} // No streaming for regular endpoint
-        );
-        if (!setupResult.passed && !cmd.continueOnError) {
-          throw new Error(`Setup command failed: ${cmd.command}`);
-        }
-      }
-    }
 
     // Run workflow steps
     for (const step of steps) {
@@ -634,10 +620,11 @@ app.post('/api/cli/workflow', async (req, res) => {
           () => {} // No streaming
         );
       } else {
-        // Command step
+        // Command step (uploaded executable) or vendor CLI step (from PATH)
+        const bin = step.type === 'vendor' ? step.executable : executablePath;
         result = await runCommandStep(
           step,
-          executablePath,
+          bin,
           workDir,
           variables,
           () => {} // No streaming

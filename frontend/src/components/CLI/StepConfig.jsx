@@ -1,6 +1,19 @@
 import { useState } from 'react';
 import './StepConfig.css';
 
+// Vendor/tooling CLIs resolved from PATH on the runner (not the uploaded binary)
+const VENDOR_CLIS = [
+  { value: 'oc', label: 'OpenShift (oc)' },
+  { value: 'kubectl', label: 'Kubernetes (kubectl)' },
+  { value: 'terraform', label: 'Terraform' },
+  { value: 'docker', label: 'Docker' },
+  { value: 'helm', label: 'Helm' },
+  { value: 'vault', label: 'Vault' },
+  { value: 'aws', label: 'AWS CLI' },
+  { value: 'gcloud', label: 'Google Cloud (gcloud)' },
+  { value: 'az', label: 'Azure CLI (az)' },
+];
+
 // Helper to ensure capture/artifacts are arrays (handles legacy string format)
 const ensureArray = (value) => {
   if (Array.isArray(value)) return value;
@@ -89,15 +102,22 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
     if (stepType === 'http') {
       return step.http?.url ? <code>{step.http.method || 'GET'} {step.http.url}</code> : null;
     }
+    if (stepType === 'vendor') {
+      return (step.executable || step.args)
+        ? <code>{[step.executable, step.args].filter(Boolean).join(' ')}</code>
+        : null;
+    }
     return step.args ? <code>{step.args}</code> : null;
   };
 
+  const typeClass = stepType === 'http' ? 'http-step' : stepType === 'vendor' ? 'vendor-step' : '';
+
   return (
-    <div className={`step-config ${stepType === 'http' ? 'http-step' : ''}`}>
+    <div className={`step-config ${typeClass}`}>
       <div className="step-header" onClick={onToggleExpand}>
         <span className="step-toggle">{isExpanded ? '▼' : '▶'}</span>
         <span className={`step-type-badge ${stepType}`}>
-          {stepType === 'http' ? 'HTTP' : 'CMD'}
+          {stepType === 'http' ? 'HTTP' : stepType === 'vendor' ? 'VND' : 'CMD'}
         </span>
         <span className="step-title">
           {step.name || step.id || `Step ${index + 1}`}
@@ -142,22 +162,75 @@ export function StepConfig({ step, index, previousStepIds = [], availableVars = 
             <div className="form-group flex-1">
               <label>
                 Step Type
-                <InfoTip text="Command runs CLI commands. HTTP makes API requests." />
+                <InfoTip text="Command runs your uploaded executable. Vendor CLI runs a tool from PATH (oc, terraform, docker…). HTTP makes API requests." />
               </label>
               <select
                 value={stepType}
-                onChange={(e) => handleChange('type', e.target.value)}
+                onChange={(e) => {
+                  const t = e.target.value;
+                  if (t === 'vendor') {
+                    handleMultiChange({ type: 'vendor', executable: step.executable || 'oc' });
+                  } else {
+                    handleChange('type', t);
+                  }
+                }}
                 className="step-type-select"
               >
                 <option value="command">Command</option>
+                <option value="vendor">Vendor CLI</option>
                 <option value="http">HTTP Request</option>
               </select>
             </div>
           </div>
 
-          {/* Command Type Fields */}
-          {stepType === 'command' && (
+          {/* Command + Vendor CLI Type Fields */}
+          {(stepType === 'command' || stepType === 'vendor') && (
             <>
+              {stepType === 'vendor' && (() => {
+                const isKnown = VENDOR_CLIS.some(c => c.value === step.executable);
+                const isCustom = !isKnown;
+                return (
+                  <div className="form-row">
+                    <div className="form-group flex-1">
+                      <label>
+                        Vendor CLI
+                        <InfoTip
+                          text="A tool resolved from PATH on the runner — not the uploaded executable. Runs in order, in between your other steps."
+                          example="oc, terraform, docker"
+                        />
+                      </label>
+                      <select
+                        className="step-type-select"
+                        value={isCustom ? 'custom' : step.executable}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          handleChange('executable', v === 'custom' ? '' : v);
+                        }}
+                      >
+                        {VENDOR_CLIS.map(c => (
+                          <option key={c.value} value={c.value}>{c.label}</option>
+                        ))}
+                        <option value="custom">Custom…</option>
+                      </select>
+                    </div>
+                    {isCustom && (
+                      <div className="form-group flex-2">
+                        <label>
+                          Executable Name
+                          <InfoTip text="Name of the CLI binary as found on the runner's PATH." example="aws" />
+                        </label>
+                        <input
+                          type="text"
+                          value={step.executable || ''}
+                          onChange={(e) => handleChange('executable', e.target.value)}
+                          placeholder="vendor-cli"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {availableVars.length > 0 && (
                 <div className="available-vars">
                   <span className="available-vars-label">Available variables:</span>
