@@ -65,6 +65,28 @@ app.post('/api/cli/executable/upload', upload.single('file'), (req, res) => {
   });
 });
 
+// Strip ANSI escape sequences (color codes, cursor moves, etc).
+// CLIs often emit \x1b[36m...\x1b[0m for colored spinners while waiting; without
+// a real terminal the non-printable ESC bytes disappear and the dashboard sees
+// raw "[36m"/"[0m" noise. We strip these from both live output and the captured
+// stdout/stderr used for assertions. Also collapses CR-only updates (spinners
+// like "\rdoing X...\rdoing Y...") to just the latest segment per line.
+const ANSI_RE = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]/g;
+function stripAnsi(text) {
+  return text.replace(ANSI_RE, '');
+}
+function collapseCarriageReturns(text) {
+  // For each line, keep only what follows the last \r (terminal overwrite).
+  // Preserve the trailing newline structure.
+  return text.split('\n').map(line => {
+    const idx = line.lastIndexOf('\r');
+    return idx === -1 ? line : line.slice(idx + 1);
+  }).join('\n');
+}
+function cleanTerminalOutput(text) {
+  return collapseCarriageReturns(stripAnsi(text));
+}
+
 // Helper to interpolate variables in a string
 function interpolateVariables(str, variables) {
   if (!str || typeof str !== 'string') return str;
@@ -183,7 +205,11 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
     };
 
     proc.stdout.on('data', (data) => {
-      const text = data.toString();
+      const text = cleanTerminalOutput(data.toString());
+      if (!text) {
+        lastStdoutTime = Date.now();
+        return;
+      }
       console.log('[runCommandStep] stdout:', text.substring(0, 100).replace(/\n/g, '\\n') + (text.length > 100 ? '...' : ''));
       stdout += text;
       onOutput({ type: 'stdout', data: text });
@@ -202,7 +228,8 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
     });
 
     proc.stderr.on('data', (data) => {
-      const text = data.toString();
+      const text = cleanTerminalOutput(data.toString());
+      if (!text) return;
       console.log('[runCommandStep] stderr:', text.substring(0, 100).replace(/\n/g, '\\n') + (text.length > 100 ? '...' : ''));
       stderr += text;
       onOutput({ type: 'stderr', data: text });
