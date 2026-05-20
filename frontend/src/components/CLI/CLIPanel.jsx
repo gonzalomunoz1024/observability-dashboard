@@ -48,6 +48,7 @@ export function CLIPanel({ serviceId }) {
 
   useEffect(() => {
     loadSavedTests();
+    setResults(getExecutionHistory(serviceId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceId]);
 
