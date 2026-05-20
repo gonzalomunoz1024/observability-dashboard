@@ -115,6 +115,12 @@ export function runWorkflowStreaming(workflow, callbacks) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      // SSE parser state must live across chunks. A large event (e.g.
+      // `stepComplete` carrying full stdout/stderr) is reliably split by the
+      // network between `event:` and `data:` lines; if these reset per chunk,
+      // the data line arrives with no event header and is silently dropped.
+      let currentEvent = null;
+      let currentData = '';
 
       function processEvents() {
         reader.read().then(({ done, value }) => {
@@ -126,9 +132,6 @@ export function runWorkflowStreaming(workflow, callbacks) {
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
-
-          let currentEvent = null;
-          let currentData = '';
 
           lines.forEach(line => {
             if (line.startsWith('event: ')) {

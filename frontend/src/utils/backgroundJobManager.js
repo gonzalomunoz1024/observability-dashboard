@@ -139,6 +139,12 @@ class BackgroundJobManager {
       job.reader = reader;
       const decoder = new TextDecoder();
       let buffer = '';
+      // SSE parser state must live across chunks. Large events (e.g.
+      // `stepComplete` for long-running steps) routinely get split between
+      // their `event:` and `data:` lines; resetting state per chunk drops
+      // those events and leaves steps stuck "running" in the UI.
+      let currentEvent = null;
+      let currentData = '';
 
       const processEvents = async () => {
         try {
@@ -151,9 +157,6 @@ class BackgroundJobManager {
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
-
-          let currentEvent = null;
-          let currentData = '';
 
           for (const line of lines) {
             if (line.startsWith('event: ')) {
