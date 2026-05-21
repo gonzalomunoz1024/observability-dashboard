@@ -95,6 +95,21 @@ function interpolateVariables(str, variables) {
   });
 }
 
+// Kill the whole process group, not just the direct child. Streaming commands
+// (e.g. "tail -f"-style log followers) frequently fork children that keep the
+// stdout pipe open; signaling only the parent leaves those children running, so
+// Node's 'close' event never fires and the run hangs forever. Spawning the child
+// detached makes it a process-group leader, and a negative PID targets the group.
+function killProcessGroup(proc, signal) {
+  if (!proc || !proc.pid) return;
+  try {
+    process.kill(-proc.pid, signal);
+  } catch (err) {
+    // Group may already be gone, or pid reused — fall back to the direct child.
+    try { proc.kill(signal); } catch (_) { /* already dead */ }
+  }
+}
+
 // Run a single command step
 async function runCommandStep(step, executablePath, workDir, variables, onOutput, streamId = null) {
   return new Promise((resolve) => {
@@ -126,7 +141,9 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
     console.log('[runCommandStep] Spawning process...');
     const proc = spawn(executablePath, argsArray, {
       cwd: workDir,
-      env: { ...process.env, ...parseEnvVars(step.envVars) }
+      env: { ...process.env, ...parseEnvVars(step.envVars) },
+      // Run in its own process group so we can kill the whole tree on timeout/cancel.
+      detached: true
     });
     console.log('[runCommandStep] Process spawned, PID:', proc.pid);
 
@@ -157,15 +174,33 @@ async function runCommandStep(step, executablePath, workDir, variables, onOutput
     // Explicit timeout handling
     const timeoutMs = step.timeout || 30000;
     timeoutHandle = setTimeout(() => {
-      if (!resolved) {
-        onOutput({ type: 'stderr', data: `[TIMEOUT] Process exceeded ${timeoutMs}ms timeout, killing...\n` });
-        proc.kill('SIGTERM');
+      if (resolved) return;
+      onOutput({ type: 'stderr', data: `[TIMEOUT] Process exceeded ${timeoutMs}ms timeout, killing...\n` });
+      killProcessGroup(proc, 'SIGTERM');
+      // Escalate to SIGKILL if SIGTERM didn't bring the group down.
+      setTimeout(() => {
+        if (resolved) return;
+        killProcessGroup(proc, 'SIGKILL');
+        // Final safety net: if even SIGKILL didn't surface a 'close' event
+        // (e.g. a stuck child holding the stdout pipe), force-resolve so the
+        // run can never hang indefinitely on a streaming command.
         setTimeout(() => {
-          if (!resolved) {
-            proc.kill('SIGKILL');
-          }
-        }, 5000); // Force kill after 5 more seconds
-      }
+          if (resolved) return;
+          resolved = true;
+          if (promptCheckInterval) clearInterval(promptCheckInterval);
+          if (streamId) activeProcesses.delete(streamId);
+          onOutput({ type: 'stderr', data: `[TIMEOUT] Process did not exit after SIGKILL; marking step as timed out.\n` });
+          resolve({
+            passed: false,
+            exitCode: -1,
+            stdout,
+            stderr,
+            duration: Date.now() - startTime,
+            timedOut: true,
+            validations: [{ type: 'timeout', expected: false, actual: true, passed: false, message: `Exceeded ${timeoutMs}ms timeout` }]
+          });
+        }, 2000);
+      }, 5000); // Force kill after 5 more seconds
     }, timeoutMs);
 
     // Stdin handling state
@@ -707,10 +742,10 @@ app.post('/api/cli/workflow/cancel/:streamId', (req, res) => {
     console.log(`[CANCEL] Cancelling workflow ${streamId}`);
     processInfo.cancelled = true;
     if (processInfo.proc && !processInfo.proc.killed) {
-      processInfo.proc.kill('SIGTERM');
+      killProcessGroup(processInfo.proc, 'SIGTERM');
       setTimeout(() => {
         if (processInfo.proc && !processInfo.proc.killed) {
-          processInfo.proc.kill('SIGKILL');
+          killProcessGroup(processInfo.proc, 'SIGKILL');
         }
       }, 2000);
     }
