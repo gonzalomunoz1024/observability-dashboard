@@ -46,6 +46,36 @@
   color: var(--color-error);
 }
 
+.running-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.running-spinner {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+
+.running-message {
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-secondary);
+}
+
+.running-elapsed {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-quaternary);
+  font-variant-numeric: tabular-nums;
+}
+
 .empty-results {
   display: flex;
   flex-direction: column;
