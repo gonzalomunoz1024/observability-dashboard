@@ -1,8 +1,10 @@
 .trace-viewer {
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
   padding: var(--space-5);
   border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
+  animation: fadeIn 0.3s ease-out;
 }
 
 .trace-header {

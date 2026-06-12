@@ -20,6 +20,13 @@
   min-width: 64px;
 }
 
+/* Hover-expand overlay: rail grows over the content without shifting it */
+.sidebar.hover-expanded {
+  width: 256px;
+  min-width: 256px;
+  box-shadow: var(--shadow-lg);
+}
+
 /* Header */
 .sidebar-header {
   padding: var(--space-5);

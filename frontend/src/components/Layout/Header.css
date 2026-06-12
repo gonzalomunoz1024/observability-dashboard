@@ -2,8 +2,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-4) var(--space-6);
-  background: var(--color-bg-secondary);
+  min-height: var(--header-height);
+  padding: var(--space-3) var(--space-6);
+  background: var(--color-bg-primary);
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -33,12 +34,12 @@
 }
 
 .stat.healthy {
-  background: rgba(52, 199, 89, 0.15);
+  background: var(--color-success-bg);
   color: var(--color-success);
 }
 
 .stat.unhealthy {
-  background: rgba(255, 59, 48, 0.15);
+  background: var(--color-error-bg);
   color: var(--color-error);
 }
 

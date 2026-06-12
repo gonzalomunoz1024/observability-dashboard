@@ -2,13 +2,17 @@ package com.dashboard.command.synthetic.adapters.inbound;
 
 import com.dashboard.command.synthetic.domain.SyntheticEvent;
 import com.dashboard.command.synthetic.domain.command.InjectEventCommand;
+import com.dashboard.command.synthetic.domain.command.RestInjectCommand;
 import com.dashboard.command.synthetic.domain.command.TraceEventCommand;
 import com.dashboard.command.synthetic.dto.inbound.InjectAndTraceRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.InjectRequestDto;
+import com.dashboard.command.synthetic.dto.inbound.RestInjectAndCheckRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.TraceRequestDto;
 import com.dashboard.command.synthetic.dto.outbound.InjectResponseDto;
+import com.dashboard.command.synthetic.dto.outbound.RestCheckResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.TraceResponseDto;
 import com.dashboard.command.synthetic.usecases.InjectEventUseCase;
+import com.dashboard.command.synthetic.usecases.RestInjectAndCheckUseCase;
 import com.dashboard.command.synthetic.usecases.TraceEventUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +30,7 @@ public class RestControllerSyntheticInboundAdapter {
 
     private final InjectEventUseCase injectEventUseCase;
     private final TraceEventUseCase traceEventUseCase;
+    private final RestInjectAndCheckUseCase restInjectAndCheckUseCase;
 
     @PostMapping("/inject")
     public Mono<ResponseEntity<?>> inject(@RequestBody InjectRequestDto request) {
@@ -114,6 +119,56 @@ public class RestControllerSyntheticInboundAdapter {
                                 return ResponseEntity.ok(response);
                             });
                 });
+    }
+
+    @PostMapping("/rest/inject-and-check")
+    public Mono<ResponseEntity<?>> restInjectAndCheck(@RequestBody RestInjectAndCheckRequestDto request) {
+        if (request.getStartUrl() == null || request.getStartUrl().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Start URL is required")));
+        }
+        if (request.getCheckerUrl() == null || request.getCheckerUrl().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Checker URL is required")));
+        }
+        if (request.getStatusJsonPath() == null || request.getStatusJsonPath().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(Map.of("error", "Status JSON path is required (e.g., \"$.status\")")));
+        }
+        if (request.getExpectedStatusValue() == null || request.getExpectedStatusValue().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(Map.of("error", "Expected status value is required (e.g., \"COMPLETED\")")));
+        }
+        if (request.getCheckerUrl().contains("{{id}}")
+                && (request.getIdJsonPath() == null || request.getIdJsonPath().isBlank())) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(Map.of("error", "ID JSON path is required when checker URL contains {{id}}")));
+        }
+
+        RestInjectCommand command = RestInjectCommand.builder()
+                .startUrl(request.getStartUrl())
+                .method(request.getMethod())
+                .body(request.getBody())
+                .headers(request.getHeaders())
+                .checkerUrl(request.getCheckerUrl())
+                .idJsonPath(request.getIdJsonPath())
+                .statusJsonPath(request.getStatusJsonPath())
+                .expectedStatusValue(request.getExpectedStatusValue())
+                .timeout(request.getTimeout() > 0 ? request.getTimeout() : 30000)
+                .pollInterval(request.getPollInterval() > 0 ? request.getPollInterval() : 1000)
+                .build();
+
+        return restInjectAndCheckUseCase.execute(command)
+                .map(result -> ResponseEntity.ok(RestCheckResponseDto.builder()
+                        .status(result.getStatus())
+                        .extractedId(result.getExtractedId())
+                        .startStatusCode(result.getStartStatusCode())
+                        .startResponseSnippet(result.getStartResponseSnippet())
+                        .attempts(result.getAttempts())
+                        .lastStatusCode(result.getLastStatusCode())
+                        .lastResponseSnippet(result.getLastResponseSnippet())
+                        .matchedValue(result.getMatchedValue())
+                        .error(result.getError())
+                        .elapsedTime(result.getElapsedTime())
+                        .build()));
     }
 
     private TraceResponseDto mapToTraceResponse(com.dashboard.command.synthetic.domain.TraceResult result) {

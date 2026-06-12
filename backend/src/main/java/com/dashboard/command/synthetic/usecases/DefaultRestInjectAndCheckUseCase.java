@@ -1,0 +1,148 @@
+package com.dashboard.command.synthetic.usecases;
+
+import com.dashboard.command.synthetic.domain.HttpProbeResponse;
+import com.dashboard.command.synthetic.domain.RestCheckResult;
+import com.dashboard.command.synthetic.domain.command.RestInjectCommand;
+import com.dashboard.command.synthetic.ports.outbound.HttpProbePort;
+import com.jayway.jsonpath.JsonPath;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
+// Start/checker URLs are user-supplied by design: this is a synthetic testing tool,
+// same trust model as the health-check and CLI workflow features.
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class DefaultRestInjectAndCheckUseCase implements RestInjectAndCheckUseCase {
+
+    private static final String ID_PLACEHOLDER = "{{id}}";
+    private static final int SNIPPET_MAX_LENGTH = 4096;
+    private static final long MIN_POLL_INTERVAL = 250;
+
+    private final HttpProbePort httpProbePort;
+
+    @Override
+    public Mono<RestCheckResult> execute(RestInjectCommand command) {
+        long startTime = System.currentTimeMillis();
+
+        return httpProbePort.execute(command.getStartUrl(), command.getMethod(),
+                        command.getBody(), command.getHeaders())
+                .onErrorResume(e -> Mono.just(HttpProbeResponse.builder()
+                        .statusCode(-1)
+                        .body("Request failed: " + e.getMessage())
+                        .build()))
+                .flatMap(startResponse -> handleStartResponse(command, startResponse, startTime));
+    }
+
+    private Mono<RestCheckResult> handleStartResponse(RestInjectCommand command,
+                                                      HttpProbeResponse startResponse, long startTime) {
+        if (startResponse.getStatusCode() < 200 || startResponse.getStatusCode() >= 300) {
+            return Mono.just(errorResult(command, startResponse, null,
+                    "Start endpoint returned status " + startResponse.getStatusCode(), startTime));
+        }
+
+        String extractedId = null;
+        String checkerUrl = command.getCheckerUrl();
+
+        if (checkerUrl.contains(ID_PLACEHOLDER)) {
+            try {
+                Object idValue = JsonPath.read(startResponse.getBody(), command.getIdJsonPath());
+                extractedId = String.valueOf(idValue);
+                checkerUrl = checkerUrl.replace(ID_PLACEHOLDER, extractedId);
+            } catch (Exception e) {
+                return Mono.just(errorResult(command, startResponse, null,
+                        "Failed to extract ID with path '" + command.getIdJsonPath() + "': " + e.getMessage(),
+                        startTime));
+            }
+        }
+
+        long pollInterval = Math.max(command.getPollInterval(), MIN_POLL_INTERVAL);
+        AtomicInteger attempts = new AtomicInteger();
+        AtomicReference<HttpProbeResponse> lastResponse = new AtomicReference<>();
+
+        return pollChecker(command, checkerUrl, extractedId, startResponse,
+                pollInterval, startTime, attempts, lastResponse);
+    }
+
+    private Mono<RestCheckResult> pollChecker(RestInjectCommand command, String checkerUrl,
+                                              String extractedId, HttpProbeResponse startResponse,
+                                              long pollInterval, long startTime,
+                                              AtomicInteger attempts,
+                                              AtomicReference<HttpProbeResponse> lastResponse) {
+        return httpProbePort.execute(checkerUrl, "GET", null, command.getHeaders())
+                .onErrorResume(e -> Mono.just(HttpProbeResponse.builder()
+                        .statusCode(-1)
+                        .body("Request failed: " + e.getMessage())
+                        .build()))
+                .flatMap(response -> {
+                    attempts.incrementAndGet();
+                    lastResponse.set(response);
+                    long elapsed = System.currentTimeMillis() - startTime;
+
+                    String matchedValue = tryExtractStatus(response, command.getStatusJsonPath());
+                    if (matchedValue != null && matchedValue.equals(command.getExpectedStatusValue())) {
+                        return Mono.just(buildResult(command, "complete", extractedId, startResponse,
+                                attempts.get(), response, matchedValue, null, elapsed));
+                    }
+
+                    if (elapsed >= command.getTimeout()) {
+                        return Mono.just(buildResult(command, "timeout", extractedId, startResponse,
+                                attempts.get(), response, null, null, elapsed));
+                    }
+
+                    return Mono.delay(Duration.ofMillis(pollInterval))
+                            .flatMap(tick -> pollChecker(command, checkerUrl, extractedId, startResponse,
+                                    pollInterval, startTime, attempts, lastResponse));
+                });
+    }
+
+    private String tryExtractStatus(HttpProbeResponse response, String statusJsonPath) {
+        if (response.getBody() == null || response.getBody().isBlank()) {
+            return null;
+        }
+        try {
+            Object value = JsonPath.read(response.getBody(), statusJsonPath);
+            return value != null ? String.valueOf(value) : null;
+        } catch (Exception e) {
+            log.debug("Status extraction failed for path '{}': {}", statusJsonPath, e.getMessage());
+            return null;
+        }
+    }
+
+    private RestCheckResult errorResult(RestInjectCommand command, HttpProbeResponse startResponse,
+                                        String extractedId, String error, long startTime) {
+        return buildResult(command, "error", extractedId, startResponse, 0, null, null, error,
+                System.currentTimeMillis() - startTime);
+    }
+
+    private RestCheckResult buildResult(RestInjectCommand command, String status, String extractedId,
+                                        HttpProbeResponse startResponse, int attempts,
+                                        HttpProbeResponse lastResponse, String matchedValue,
+                                        String error, long elapsed) {
+        return RestCheckResult.builder()
+                .status(status)
+                .extractedId(extractedId)
+                .startStatusCode(startResponse != null ? startResponse.getStatusCode() : 0)
+                .startResponseSnippet(startResponse != null ? truncate(startResponse.getBody()) : null)
+                .attempts(attempts)
+                .lastStatusCode(lastResponse != null ? lastResponse.getStatusCode() : 0)
+                .lastResponseSnippet(lastResponse != null ? truncate(lastResponse.getBody()) : null)
+                .matchedValue(matchedValue)
+                .error(error)
+                .elapsedTime(elapsed)
+                .build();
+    }
+
+    private String truncate(String body) {
+        if (body == null || body.length() <= SNIPPET_MAX_LENGTH) {
+            return body;
+        }
+        return body.substring(0, SNIPPET_MAX_LENGTH) + "… [truncated]";
+    }
+}

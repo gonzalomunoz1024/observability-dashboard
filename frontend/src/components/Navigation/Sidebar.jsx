@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { useServices } from '../../context/ServicesContext';
 import { useTheme } from '../../context/ThemeContext';
 import { ServiceItem } from './ServiceItem';
@@ -17,12 +17,20 @@ export const Sidebar = memo(function Sidebar({
 }) {
   const { services, statuses } = useServices();
   const { theme, toggleTheme } = useTheme();
+  const [hovered, setHovered] = useState(false);
 
   const restServices = services.filter(s => s.type === 'rest');
   const cliServices = services.filter(s => s.type === 'cli');
 
+  // Hover-expand: the collapsed rail expands as an overlay without shifting content
+  const railCollapsed = collapsed && !hovered;
+
   return (
-    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+    <aside
+      className={`sidebar ${railCollapsed ? 'collapsed' : ''} ${collapsed && hovered ? 'hover-expanded' : ''}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div className="sidebar-header">
         <h1 className="sidebar-logo">
           <span className="logo-icon">
@@ -35,7 +43,7 @@ export const Sidebar = memo(function Sidebar({
               <path d="M2 12h3l2-4 2 8 2-6 2 4h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
             </svg>
           </span>
-          {!collapsed && (
+          {!railCollapsed && (
             <span className="logo-text">
               Observability
               <strong>Forge</strong>
@@ -55,11 +63,11 @@ export const Sidebar = memo(function Sidebar({
               <path d="M8 1.5L1.5 6.5V14.5H6V10.5C6 10 6.5 9.5 7 9.5H9C9.5 9.5 10 10 10 10.5V14.5H14.5V6.5L8 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
-          {!collapsed && 'Dashboard'}
+          {!railCollapsed && 'Dashboard'}
         </button>
 
         <div className="nav-section">
-          {!collapsed && (
+          {!railCollapsed && (
             <div className="nav-section-header">
               <span>Services</span>
               <button
@@ -75,7 +83,7 @@ export const Sidebar = memo(function Sidebar({
           )}
 
           {services.length === 0 ? (
-            !collapsed && (
+            !railCollapsed && (
               <div className="no-services">
                 No services configured
               </div>
@@ -84,7 +92,7 @@ export const Sidebar = memo(function Sidebar({
             <div className="services-list">
               {restServices.length > 0 && (
                 <div className="service-group">
-                  {!collapsed && <span className="group-label">REST</span>}
+                  {!railCollapsed && <span className="group-label">REST</span>}
                   {restServices.map(service => (
                     <ServiceItem
                       key={service.id}
@@ -92,7 +100,7 @@ export const Sidebar = memo(function Sidebar({
                       status={statuses[service.id]}
                       isActive={activeView === service.id}
                       onClick={() => onSelectView(service.id)}
-                      collapsed={collapsed}
+                      collapsed={railCollapsed}
                     />
                   ))}
                 </div>
@@ -100,7 +108,7 @@ export const Sidebar = memo(function Sidebar({
 
               {cliServices.length > 0 && (
                 <div className="service-group">
-                  {!collapsed && <span className="group-label">CLI</span>}
+                  {!railCollapsed && <span className="group-label">CLI</span>}
                   {cliServices.map(service => (
                     <ServiceItem
                       key={service.id}
@@ -108,7 +116,7 @@ export const Sidebar = memo(function Sidebar({
                       status={statuses[service.id]}
                       isActive={activeView === service.id}
                       onClick={() => onSelectView(service.id)}
-                      collapsed={collapsed}
+                      collapsed={railCollapsed}
                     />
                   ))}
                 </div>
@@ -134,7 +142,7 @@ export const Sidebar = memo(function Sidebar({
               <path d="M14 10.5A6.5 6.5 0 015.5 2 6.5 6.5 0 1014 10.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           )}
-          {!collapsed && (theme === 'light' ? 'Dark' : 'Light')}
+          {!railCollapsed && (theme === 'light' ? 'Dark' : 'Light')}
         </button>
 
         <button

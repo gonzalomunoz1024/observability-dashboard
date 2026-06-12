@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { SyntheticForm } from './SyntheticForm';
 import { TraceViewer } from './TraceViewer';
+import { RestCheckViewer } from './RestCheckViewer';
 import './SyntheticPanel.css';
 
 export function SyntheticPanel() {
@@ -37,9 +38,13 @@ export function SyntheticPanel() {
           </div>
         ) : (
           <div className="results-list">
-            {results.map((result, index) => (
-              <TraceViewer key={index} result={result} />
-            ))}
+            {results.map((result, index) =>
+              result.mode === 'rest' ? (
+                <RestCheckViewer key={index} result={result} />
+              ) : (
+                <TraceViewer key={index} result={result} />
+              )
+            )}
           </div>
         )}
       </div>
