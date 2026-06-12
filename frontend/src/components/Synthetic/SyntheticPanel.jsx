@@ -14,7 +14,7 @@ function RunningIndicator({ run }) {
 
   const message =
     run.mode === 'rest'
-      ? 'Calling start endpoint & polling checker…'
+      ? 'Calling start endpoint & polling status probe…'
       : 'Injecting event & tracing flow…';
 
   return (

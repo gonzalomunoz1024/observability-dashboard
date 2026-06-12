@@ -157,7 +157,7 @@ export function RestCheckViewer({ result }) {
         <div className="response-section">
           <div className="response-head">
             <h4>
-              Last Checker Response{' '}
+              Last Probe Response{' '}
               {check.lastStatusCode > 0 && (
                 <span className="http-code">HTTP {check.lastStatusCode}</span>
               )}

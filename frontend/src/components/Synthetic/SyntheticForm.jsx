@@ -360,7 +360,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
 
           <div className="form-section">
             <div className="form-section-header form-section-static">
-              <span className="form-section-title">Checker</span>
+              <span className="form-section-title">Status Probe</span>
               {restData.expectedStatusValue && (
                 <span className="form-section-summary">
                   {restData.statusJsonPath} = {restData.expectedStatusValue}
@@ -369,7 +369,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
             </div>
             <div className="form-section-body">
               <div className="form-group">
-                <label htmlFor="checkerUrl">Checker (Status) Endpoint</label>
+                <label htmlFor="checkerUrl">Probe Endpoint</label>
                 <input
                   id="checkerUrl"
                   type="text"
@@ -496,7 +496,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
                       </button>
                     </div>
                   ))}
-                  <span className="hint">Applied to both start and checker requests</span>
+                  <span className="hint">Applied to both start and probe requests</span>
                 </div>
               </div>
             )}
