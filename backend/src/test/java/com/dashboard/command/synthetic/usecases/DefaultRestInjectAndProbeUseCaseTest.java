@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class DefaultRestInjectAndCheckUseCaseTest {
+class DefaultRestInjectAndProbeUseCaseTest {
 
     private static HttpProbeResponse response(int status, String body) {
         return HttpProbeResponse.builder().statusCode(status).body(body).build();
@@ -45,7 +45,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
                     : Mono.just(response(200, "{\"status\":\"COMPLETED\"}"));
         };
 
-        DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
+        DefaultRestInjectAndProbeUseCase useCase = new DefaultRestInjectAndProbeUseCase(port);
 
         StepVerifier.create(useCase.execute(baseCommand().build()))
                 .assertNext(result -> {
@@ -65,7 +65,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
                         ? Mono.just(response(200, "{\"transactionId\":\"tx-1\"}"))
                         : Mono.just(response(200, "{\"status\":\"PENDING\"}"));
 
-        DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
+        DefaultRestInjectAndProbeUseCase useCase = new DefaultRestInjectAndProbeUseCase(port);
         RestInjectCommand command = baseCommand().timeout(600).pollInterval(250).build();
 
         StepVerifier.create(useCase.execute(command))
@@ -83,7 +83,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
         HttpProbePort port = (url, method, body, headers) ->
                 Mono.just(response(500, "{\"message\":\"boom\"}"));
 
-        DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
+        DefaultRestInjectAndProbeUseCase useCase = new DefaultRestInjectAndProbeUseCase(port);
 
         StepVerifier.create(useCase.execute(baseCommand().build()))
                 .assertNext(result -> {
@@ -100,7 +100,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
         HttpProbePort port = (url, method, body, headers) ->
                 Mono.just(response(200, "{\"somethingElse\":\"x\"}"));
 
-        DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
+        DefaultRestInjectAndProbeUseCase useCase = new DefaultRestInjectAndProbeUseCase(port);
 
         StepVerifier.create(useCase.execute(baseCommand().build()))
                 .assertNext(result -> {
@@ -117,7 +117,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
                         ? Mono.just(response(200, "{\"transactionId\":\"tx-1\"}"))
                         : Mono.just(response(200, "<html>not json</html>"));
 
-        DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
+        DefaultRestInjectAndProbeUseCase useCase = new DefaultRestInjectAndProbeUseCase(port);
         RestInjectCommand command = baseCommand().timeout(600).pollInterval(250).build();
 
         StepVerifier.create(useCase.execute(command))
@@ -132,7 +132,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
                         ? Mono.just(response(201, "not even json"))
                         : Mono.just(response(200, "{\"status\":\"COMPLETED\"}"));
 
-        DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
+        DefaultRestInjectAndProbeUseCase useCase = new DefaultRestInjectAndProbeUseCase(port);
         RestInjectCommand command = baseCommand()
                 .probeUrl("http://example.test/status/static")
                 .idJsonPath(null)
@@ -158,7 +158,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
                     : Mono.just(response(200, "{\"status\":\"COMPLETED\"}"));
         };
 
-        DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
+        DefaultRestInjectAndProbeUseCase useCase = new DefaultRestInjectAndProbeUseCase(port);
 
         StepVerifier.create(useCase.execute(baseCommand().headers(expectedHeaders).build()))
                 .assertNext(result -> assertThat(result.getStatus()).isEqualTo("complete"))

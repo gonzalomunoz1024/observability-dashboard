@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DefaultRestInjectAndCheckUseCase implements RestInjectAndCheckUseCase {
+public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCase {
 
     private static final String ID_PLACEHOLDER = "{{id}}";
     private static final int SNIPPET_MAX_LENGTH = 4096;

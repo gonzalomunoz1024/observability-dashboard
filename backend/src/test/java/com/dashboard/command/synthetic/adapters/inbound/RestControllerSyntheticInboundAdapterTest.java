@@ -2,7 +2,7 @@ package com.dashboard.command.synthetic.adapters.inbound;
 
 import com.dashboard.command.synthetic.domain.RestCheckResult;
 import com.dashboard.command.synthetic.dto.inbound.RestInjectAndCheckRequestDto;
-import com.dashboard.command.synthetic.usecases.RestInjectAndCheckUseCase;
+import com.dashboard.command.synthetic.usecases.RestInjectAndProbeUseCase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +17,7 @@ class RestControllerSyntheticInboundAdapterTest {
 
     @BeforeEach
     void setUp() {
-        RestInjectAndCheckUseCase useCase = command -> Mono.just(RestCheckResult.builder()
+        RestInjectAndProbeUseCase useCase = command -> Mono.just(RestCheckResult.builder()
                 .status("complete")
                 .attempts(1)
                 .build());

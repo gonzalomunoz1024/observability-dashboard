@@ -12,7 +12,7 @@ import com.dashboard.command.synthetic.dto.outbound.InjectResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.RestCheckResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.TraceResponseDto;
 import com.dashboard.command.synthetic.usecases.InjectEventUseCase;
-import com.dashboard.command.synthetic.usecases.RestInjectAndCheckUseCase;
+import com.dashboard.command.synthetic.usecases.RestInjectAndProbeUseCase;
 import com.dashboard.command.synthetic.usecases.TraceEventUseCase;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,7 +30,7 @@ public class RestControllerSyntheticInboundAdapter {
 
     private final InjectEventUseCase injectEventUseCase;
     private final TraceEventUseCase traceEventUseCase;
-    private final RestInjectAndCheckUseCase restInjectAndCheckUseCase;
+    private final RestInjectAndProbeUseCase restInjectAndProbeUseCase;
 
     @PostMapping("/inject")
     public Mono<ResponseEntity<?>> inject(@RequestBody InjectRequestDto request) {
@@ -156,7 +156,7 @@ public class RestControllerSyntheticInboundAdapter {
                 .pollInterval(request.getPollInterval() > 0 ? request.getPollInterval() : 1000)
                 .build();
 
-        return restInjectAndCheckUseCase.execute(command)
+        return restInjectAndProbeUseCase.execute(command)
                 .map(result -> ResponseEntity.ok(RestCheckResponseDto.builder()
                         .status(result.getStatus())
                         .extractedId(result.getExtractedId())
