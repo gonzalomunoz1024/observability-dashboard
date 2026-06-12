@@ -20,7 +20,16 @@
   font-size: var(--font-size-lg);
 }
 
+.trace-header-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .trace-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
