@@ -49,7 +49,7 @@ export function MonitoredServiceCard({ service, onEdit, onDelete, onRefresh }) {
     : 'disabled';
 
   return (
-    <div className={`service-card status-${statusClass}`}>
+    <div className={`service-card monitored-service-card status-${statusClass}`}>
       <div className="card-header">
         <div className="service-info">
           <h3 className="service-name">{service.name}</h3>

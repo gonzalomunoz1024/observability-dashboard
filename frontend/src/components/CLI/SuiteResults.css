@@ -69,21 +69,21 @@
   margin-bottom: var(--space-3);
 }
 
-.stat {
+.summary-stats .stat {
   background: var(--color-bg-primary);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   text-align: center;
 }
 
-.stat-value {
+.summary-stats .stat-value {
   display: block;
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
   color: var(--color-fg-primary);
 }
 
-.stat-label {
+.summary-stats .stat-label {
   display: block;
   font-size: 10px;
   color: var(--color-fg-quaternary);
@@ -92,23 +92,23 @@
   margin-top: var(--space-1);
 }
 
-.stat.all-passed .stat-value {
+.summary-stats .stat.all-passed .stat-value {
   color: var(--color-success);
 }
 
-.stat.has-failures .stat-value {
+.summary-stats .stat.has-failures .stat-value {
   color: var(--color-warning);
 }
 
-.stat.passed .stat-value {
+.summary-stats .stat.passed .stat-value {
   color: var(--color-success);
 }
 
-.stat.failed .stat-value {
+.summary-stats .stat.failed .stat-value {
   color: var(--color-error);
 }
 
-.stat.duration .stat-value {
+.summary-stats .stat.duration .stat-value {
   font-size: var(--font-size-xl);
 }
 

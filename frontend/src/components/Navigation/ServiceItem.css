@@ -26,7 +26,7 @@
 }
 
 /* Service Name */
-.service-name {
+.service-item .service-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;

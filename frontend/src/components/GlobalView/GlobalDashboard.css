@@ -95,7 +95,7 @@
   border-color: var(--color-border-default);
 }
 
-.stat-value {
+.stat-card .stat-value {
   display: block;
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-semibold);
@@ -112,7 +112,7 @@
   color: var(--color-error);
 }
 
-.stat-label {
+.stat-card .stat-label {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   color: var(--color-fg-quaternary);

@@ -58,9 +58,11 @@
   letter-spacing: var(--letter-spacing-wide);
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
+/* Scoped under .synthetic-form: other components define global .form-group
+   input rules (AddServiceModal, StepConfig) that otherwise win by import order */
+.synthetic-form .form-group input,
+.synthetic-form .form-group select,
+.synthetic-form .form-group textarea {
   width: 100%;
   padding: var(--space-3);
   background: var(--color-bg-primary);
@@ -72,21 +74,21 @@
   font-family: inherit;
 }
 
-.form-group textarea {
+.synthetic-form .form-group textarea {
   resize: vertical;
   font-family: var(--font-family-mono);
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+.synthetic-form .form-group input:focus,
+.synthetic-form .form-group select:focus,
+.synthetic-form .form-group textarea:focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: var(--shadow-focus);
 }
 
-.form-group input::placeholder,
-.form-group textarea::placeholder {
+.synthetic-form .form-group input::placeholder,
+.synthetic-form .form-group textarea::placeholder {
   color: var(--color-fg-quaternary);
 }
 

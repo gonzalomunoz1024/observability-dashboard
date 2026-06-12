@@ -109,15 +109,16 @@
   line-height: var(--line-height-relaxed);
 }
 
-/* Form */
-.form-group {
+/* Form — scoped under .add-service-modal: CRA bundles all CSS globally and
+   this file loads last, so bare .form-group/.form-row rules clobbered other forms */
+.add-service-modal .form-group {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
 
-.form-group label {
+.add-service-modal .form-group label {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   color: var(--color-fg-tertiary);
@@ -125,34 +126,35 @@
   letter-spacing: var(--letter-spacing-wide);
 }
 
-.form-group input,
-.form-group select {
+.add-service-modal .form-group input,
+.add-service-modal .form-group select {
   padding: var(--space-3) var(--space-4);
   background-color: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border-subtle);
+  /* border-default, not subtle: in dark, subtle === bg-tertiary === modal bg */
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   color: var(--color-fg-primary);
   font-size: var(--font-size-sm);
   transition: all var(--transition-fast);
 }
 
-.form-group input:hover,
-.form-group select:hover {
-  border-color: var(--color-border-default);
+.add-service-modal .form-group input:hover,
+.add-service-modal .form-group select:hover {
+  border-color: var(--color-border-strong);
 }
 
-.form-group input:focus,
-.form-group select:focus {
+.add-service-modal .form-group input:focus,
+.add-service-modal .form-group select:focus {
   outline: none;
   border-color: var(--color-accent);
   background-color: var(--color-bg-elevated);
 }
 
-.form-group input::placeholder {
+.add-service-modal .form-group input::placeholder {
   color: var(--color-fg-quaternary);
 }
 
-.form-row {
+.add-service-modal .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
@@ -231,11 +233,11 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
-.btn-cancel,
-.btn-back {
+.add-service-modal .btn-cancel,
+.add-service-modal .btn-back {
   padding: var(--space-2) var(--space-4);
   background: transparent;
-  border: 1px solid var(--color-border-subtle);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-md);
   color: var(--color-fg-tertiary);
   font-size: var(--font-size-sm);
@@ -244,14 +246,14 @@
   transition: all var(--transition-fast);
 }
 
-.btn-cancel:hover,
-.btn-back:hover {
+.add-service-modal .btn-cancel:hover,
+.add-service-modal .btn-back:hover {
   background-color: var(--color-bg-tertiary);
   border-color: var(--color-border-default);
   color: var(--color-fg-primary);
 }
 
-.btn-submit {
+.add-service-modal .btn-submit {
   padding: var(--space-2) var(--space-4);
   background-color: var(--color-fg-primary);
   border: none;
@@ -263,11 +265,11 @@
   transition: opacity var(--transition-fast);
 }
 
-.btn-submit:hover:not(:disabled) {
+.add-service-modal .btn-submit:hover:not(:disabled) {
   opacity: 0.9;
 }
 
-.btn-submit:disabled {
+.add-service-modal .btn-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

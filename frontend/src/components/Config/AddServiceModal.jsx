@@ -82,7 +82,7 @@ export function AddServiceModal({ onClose, onServiceAdded }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div className="modal-content add-service-modal" onClick={e => e.stopPropagation()}>
         {step === 'choose' && (
           <>
             <h2>Add New Service</h2>

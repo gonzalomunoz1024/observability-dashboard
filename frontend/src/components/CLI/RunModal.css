@@ -406,7 +406,7 @@
 }
 
 .progress-step.running {
-  background: rgba(var(--color-accent-rgb, 59, 130, 246), 0.1);
+  background: var(--color-info-bg);
 }
 
 .progress-step.passed {
@@ -770,7 +770,7 @@
 }
 
 .complete-message {
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
   color: var(--color-fg-primary);
   font-weight: 500;
 }
@@ -994,7 +994,7 @@
   background: transparent;
   border: none;
   color: var(--color-fg-quaternary);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
   cursor: pointer;
   border-radius: var(--radius-sm);
   transition: all 0.15s;

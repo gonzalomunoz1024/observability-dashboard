@@ -45,7 +45,7 @@
   gap: var(--space-3);
   margin: 0;
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-weight: var(--font-weight-regular);
   color: var(--color-fg-tertiary);
   line-height: var(--line-height-tight);
 }

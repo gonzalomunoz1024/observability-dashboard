@@ -83,7 +83,7 @@
   color: var(--color-accent);
 }
 
-.service-name {
+.card-header > .service-name {
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
@@ -118,7 +118,7 @@
   gap: var(--space-1);
 }
 
-.stat-label {
+.stat-item .stat-label {
   font-size: 10px;
   font-weight: var(--font-weight-medium);
   color: var(--color-fg-quaternary);
@@ -126,7 +126,7 @@
   letter-spacing: var(--letter-spacing-wide);
 }
 
-.stat-value {
+.stat-item .stat-value {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-fg-primary);
