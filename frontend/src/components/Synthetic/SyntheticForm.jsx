@@ -23,7 +23,7 @@ const defaultRestData = {
 };
 
 export function SyntheticForm({ onResult }) {
-  const [mode, setMode] = useState('kafka');
+  const [mode, setMode] = useState('rest');
   const [formData, setFormData] = useState(defaultKafkaData);
   const [restData, setRestData] = useState(defaultRestData);
   const [headers, setHeaders] = useState([]);
@@ -129,17 +129,17 @@ export function SyntheticForm({ onResult }) {
       <div className="mode-selector" role="radiogroup" aria-label="Injection mode">
         <button
           type="button"
-          className={`mode-option ${mode === 'kafka' ? 'mode-active' : ''}`}
-          onClick={() => { setMode('kafka'); setError(null); }}
-        >
-          Kafka
-        </button>
-        <button
-          type="button"
           className={`mode-option ${mode === 'rest' ? 'mode-active' : ''}`}
           onClick={() => { setMode('rest'); setError(null); }}
         >
           REST Controller
+        </button>
+        <button
+          type="button"
+          className={`mode-option ${mode === 'kafka' ? 'mode-active' : ''}`}
+          onClick={() => { setMode('kafka'); setError(null); }}
+        >
+          Kafka
         </button>
       </div>
 
