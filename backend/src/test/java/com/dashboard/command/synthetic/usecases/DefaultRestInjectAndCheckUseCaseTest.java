@@ -24,7 +24,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
                 .startUrl("http://example.test/start")
                 .method("POST")
                 .body("{\"foo\":\"bar\"}")
-                .checkerUrl("http://example.test/status/{{id}}")
+                .probeUrl("http://example.test/status/{{id}}")
                 .idJsonPath("$.transactionId")
                 .statusJsonPath("$.status")
                 .expectedStatusValue("COMPLETED")
@@ -33,14 +33,14 @@ class DefaultRestInjectAndCheckUseCaseTest {
     }
 
     @Test
-    void completesWhenCheckerMatchesOnSecondAttempt() {
-        AtomicInteger checkerCalls = new AtomicInteger();
+    void completesWhenProbeMatchesOnSecondAttempt() {
+        AtomicInteger probeCalls = new AtomicInteger();
         HttpProbePort port = (url, method, body, headers) -> {
             if (url.endsWith("/start")) {
                 return Mono.just(response(200, "{\"transactionId\":\"tx-123\"}"));
             }
             assertThat(url).isEqualTo("http://example.test/status/tx-123");
-            return checkerCalls.incrementAndGet() < 2
+            return probeCalls.incrementAndGet() < 2
                     ? Mono.just(response(200, "{\"status\":\"PENDING\"}"))
                     : Mono.just(response(200, "{\"status\":\"COMPLETED\"}"));
         };
@@ -59,7 +59,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
     }
 
     @Test
-    void timesOutWhenCheckerNeverMatches() {
+    void timesOutWhenProbeNeverMatches() {
         HttpProbePort port = (url, method, body, headers) ->
                 url.endsWith("/start")
                         ? Mono.just(response(200, "{\"transactionId\":\"tx-1\"}"))
@@ -111,7 +111,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
     }
 
     @Test
-    void keepsPollingToTimeoutWhenCheckerBodyIsNotJson() {
+    void keepsPollingToTimeoutWhenProbeBodyIsNotJson() {
         HttpProbePort port = (url, method, body, headers) ->
                 url.endsWith("/start")
                         ? Mono.just(response(200, "{\"transactionId\":\"tx-1\"}"))
@@ -126,7 +126,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
     }
 
     @Test
-    void skipsIdExtractionForStaticCheckerUrl() {
+    void skipsIdExtractionForStaticProbeUrl() {
         HttpProbePort port = (url, method, body, headers) ->
                 url.endsWith("/start")
                         ? Mono.just(response(201, "not even json"))
@@ -134,7 +134,7 @@ class DefaultRestInjectAndCheckUseCaseTest {
 
         DefaultRestInjectAndCheckUseCase useCase = new DefaultRestInjectAndCheckUseCase(port);
         RestInjectCommand command = baseCommand()
-                .checkerUrl("http://example.test/status/static")
+                .probeUrl("http://example.test/status/static")
                 .idJsonPath(null)
                 .build();
 

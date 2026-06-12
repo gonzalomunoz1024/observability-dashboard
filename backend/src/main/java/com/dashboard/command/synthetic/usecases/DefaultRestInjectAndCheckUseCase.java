@@ -14,7 +14,7 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-// Start/checker URLs are user-supplied by design: this is a synthetic testing tool,
+// Start/probe URLs are user-supplied by design: this is a synthetic testing tool,
 // same trust model as the health-check and CLI workflow features.
 @Slf4j
 @Service
@@ -48,13 +48,13 @@ public class DefaultRestInjectAndCheckUseCase implements RestInjectAndCheckUseCa
         }
 
         String extractedId = null;
-        String checkerUrl = command.getCheckerUrl();
+        String probeUrl = command.getProbeUrl();
 
-        if (checkerUrl.contains(ID_PLACEHOLDER)) {
+        if (probeUrl.contains(ID_PLACEHOLDER)) {
             try {
                 Object idValue = JsonPath.read(startResponse.getBody(), command.getIdJsonPath());
                 extractedId = String.valueOf(idValue);
-                checkerUrl = checkerUrl.replace(ID_PLACEHOLDER, extractedId);
+                probeUrl = probeUrl.replace(ID_PLACEHOLDER, extractedId);
             } catch (Exception e) {
                 return Mono.just(errorResult(command, startResponse, null,
                         "Failed to extract ID with path '" + command.getIdJsonPath() + "': " + e.getMessage(),
@@ -66,16 +66,16 @@ public class DefaultRestInjectAndCheckUseCase implements RestInjectAndCheckUseCa
         AtomicInteger attempts = new AtomicInteger();
         AtomicReference<HttpProbeResponse> lastResponse = new AtomicReference<>();
 
-        return pollChecker(command, checkerUrl, extractedId, startResponse,
+        return pollProbe(command, probeUrl, extractedId, startResponse,
                 pollInterval, startTime, attempts, lastResponse);
     }
 
-    private Mono<RestCheckResult> pollChecker(RestInjectCommand command, String checkerUrl,
+    private Mono<RestCheckResult> pollProbe(RestInjectCommand command, String probeUrl,
                                               String extractedId, HttpProbeResponse startResponse,
                                               long pollInterval, long startTime,
                                               AtomicInteger attempts,
                                               AtomicReference<HttpProbeResponse> lastResponse) {
-        return httpProbePort.execute(checkerUrl, "GET", null, command.getHeaders())
+        return httpProbePort.execute(probeUrl, "GET", null, command.getHeaders())
                 .onErrorResume(e -> Mono.just(HttpProbeResponse.builder()
                         .statusCode(-1)
                         .body("Request failed: " + e.getMessage())
@@ -97,7 +97,7 @@ public class DefaultRestInjectAndCheckUseCase implements RestInjectAndCheckUseCa
                     }
 
                     return Mono.delay(Duration.ofMillis(pollInterval))
-                            .flatMap(tick -> pollChecker(command, checkerUrl, extractedId, startResponse,
+                            .flatMap(tick -> pollProbe(command, probeUrl, extractedId, startResponse,
                                     pollInterval, startTime, attempts, lastResponse));
                 });
     }

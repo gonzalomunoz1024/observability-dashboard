@@ -14,7 +14,7 @@ const defaultRestData = {
   startUrl: '',
   method: 'POST',
   body: '{}',
-  checkerUrl: '',
+  probeUrl: '',
   idJsonPath: '',
   statusJsonPath: '$.status',
   expectedStatusValue: '',
@@ -162,7 +162,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
       method: restData.method,
       body: restData.body,
       headers: headerMap,
-      checkerUrl: restData.checkerUrl,
+      probeUrl: restData.probeUrl,
       idJsonPath: restData.idJsonPath,
       statusJsonPath: restData.statusJsonPath,
       expectedStatusValue: restData.expectedStatusValue,
@@ -175,7 +175,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
       request: {
         startUrl: restData.startUrl,
         method: restData.method,
-        checkerUrl: restData.checkerUrl,
+        probeUrl: restData.probeUrl,
         expectedStatusValue: restData.expectedStatusValue,
         statusJsonPath: restData.statusJsonPath,
       },
@@ -369,12 +369,12 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
             </div>
             <div className="form-section-body">
               <div className="form-group">
-                <label htmlFor="checkerUrl">Probe Endpoint</label>
+                <label htmlFor="probeUrl">Probe Endpoint</label>
                 <input
-                  id="checkerUrl"
+                  id="probeUrl"
                   type="text"
-                  value={restData.checkerUrl}
-                  onChange={(e) => handleRestChange('checkerUrl', e.target.value)}
+                  value={restData.probeUrl}
+                  onChange={(e) => handleRestChange('probeUrl', e.target.value)}
                   placeholder="https://api.example.com/orders/{{id}}/status"
                   required
                 />
@@ -391,7 +391,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
                   value={restData.idJsonPath}
                   onChange={(e) => handleRestChange('idJsonPath', e.target.value)}
                   placeholder="$.transactionId"
-                  required={restData.checkerUrl.includes('{{id}}')}
+                  required={restData.probeUrl.includes('{{id}}')}
                 />
                 <span className="hint">JSONPath to the ID in the start response</span>
               </div>

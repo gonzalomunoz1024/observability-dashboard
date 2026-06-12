@@ -27,7 +27,7 @@ class RestControllerSyntheticInboundAdapterTest {
     private static RestInjectAndCheckRequestDto.RestInjectAndCheckRequestDtoBuilder validRequest() {
         return RestInjectAndCheckRequestDto.builder()
                 .startUrl("http://example.test/start")
-                .checkerUrl("http://example.test/status/{{id}}")
+                .probeUrl("http://example.test/status/{{id}}")
                 .idJsonPath("$.id")
                 .statusJsonPath("$.status")
                 .expectedStatusValue("COMPLETED");
@@ -41,8 +41,8 @@ class RestControllerSyntheticInboundAdapterTest {
     }
 
     @Test
-    void returns400WhenCheckerUrlMissing() {
-        StepVerifier.create(adapter.restInjectAndCheck(validRequest().checkerUrl(" ").build()))
+    void returns400WhenProbeUrlMissing() {
+        StepVerifier.create(adapter.restInjectAndCheck(validRequest().probeUrl(" ").build()))
                 .assertNext(response -> assertThat(response.getStatusCode().value()).isEqualTo(400))
                 .verifyComplete();
     }
@@ -79,9 +79,9 @@ class RestControllerSyntheticInboundAdapterTest {
     }
 
     @Test
-    void allowsStaticCheckerUrlWithoutIdPath() {
+    void allowsStaticProbeUrlWithoutIdPath() {
         StepVerifier.create(adapter.restInjectAndCheck(validRequest()
-                        .checkerUrl("http://example.test/status/static")
+                        .probeUrl("http://example.test/status/static")
                         .idJsonPath(null)
                         .build()))
                 .assertNext(response -> assertThat(response.getStatusCode().value()).isEqualTo(200))

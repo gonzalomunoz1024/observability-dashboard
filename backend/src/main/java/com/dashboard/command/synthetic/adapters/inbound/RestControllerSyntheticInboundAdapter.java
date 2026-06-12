@@ -126,8 +126,8 @@ public class RestControllerSyntheticInboundAdapter {
         if (request.getStartUrl() == null || request.getStartUrl().isBlank()) {
             return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Start URL is required")));
         }
-        if (request.getCheckerUrl() == null || request.getCheckerUrl().isBlank()) {
-            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Checker URL is required")));
+        if (request.getProbeUrl() == null || request.getProbeUrl().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Probe URL is required")));
         }
         if (request.getStatusJsonPath() == null || request.getStatusJsonPath().isBlank()) {
             return Mono.just(ResponseEntity.badRequest()
@@ -137,10 +137,10 @@ public class RestControllerSyntheticInboundAdapter {
             return Mono.just(ResponseEntity.badRequest()
                     .body(Map.of("error", "Expected status value is required (e.g., \"COMPLETED\")")));
         }
-        if (request.getCheckerUrl().contains("{{id}}")
+        if (request.getProbeUrl().contains("{{id}}")
                 && (request.getIdJsonPath() == null || request.getIdJsonPath().isBlank())) {
             return Mono.just(ResponseEntity.badRequest()
-                    .body(Map.of("error", "ID JSON path is required when checker URL contains {{id}}")));
+                    .body(Map.of("error", "ID JSON path is required when probe URL contains {{id}}")));
         }
 
         RestInjectCommand command = RestInjectCommand.builder()
@@ -148,7 +148,7 @@ public class RestControllerSyntheticInboundAdapter {
                 .method(request.getMethod())
                 .body(request.getBody())
                 .headers(request.getHeaders())
-                .checkerUrl(request.getCheckerUrl())
+                .probeUrl(request.getProbeUrl())
                 .idJsonPath(request.getIdJsonPath())
                 .statusJsonPath(request.getStatusJsonPath())
                 .expectedStatusValue(request.getExpectedStatusValue())

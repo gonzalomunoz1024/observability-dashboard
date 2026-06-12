@@ -17,7 +17,7 @@ public class RestInjectAndCheckRequestDto {
     private String method = "POST";
     private String body;
     private Map<String, String> headers;
-    private String checkerUrl;
+    private String probeUrl;
     private String idJsonPath;
     private String statusJsonPath;
     private String expectedStatusValue;
