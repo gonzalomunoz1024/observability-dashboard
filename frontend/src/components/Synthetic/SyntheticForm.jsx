@@ -1,18 +1,9 @@
 import { useEffect, useState } from 'react';
 import { IdPathPicker } from './IdPathPicker';
 import { JsonEditor } from './JsonEditor';
-import { RequestShapePanel } from './RequestShapePanel';
+import { DynamicValuePicker } from './DynamicValuePicker';
 import { previewTemplate } from '../../utils/synthetic';
 import './SyntheticForm.css';
-
-export const DEFAULT_KAFKA_CONFIG = {
-  topic: '',
-  eventType: '',
-  expectedFlow: '',
-  timeout: 30000,
-  payload: '{}',
-  dynamicFields: [],
-};
 
 export const DEFAULT_REST_CONFIG = {
   startUrl: '',
@@ -180,13 +171,25 @@ function FieldLabel({ htmlFor, label, onExpand }) {
   );
 }
 
-function JsonFieldHeader({ label, validity, onBeautify, onExpand, onPreview }) {
+function JsonFieldHeader({ label, validity, onBeautify, onExpand, onPreview, onAddDynamic }) {
   return (
     <div className="label-row">
       <span className="label-text">{label}</span>
       <span className="label-row-actions">
         {validity === 'invalid' && <span className="json-chip json-chip-invalid">Invalid JSON</span>}
         {validity === 'valid' && <span className="json-chip json-chip-valid">JSON</span>}
+        {onAddDynamic && (
+          <button
+            type="button"
+            className="dyn-add-btn"
+            onClick={onAddDynamic}
+            disabled={validity !== 'valid'}
+            title="Pick a key in the body and make its value dynamically generated"
+          >
+            <WandIcon />
+            <span>Dynamic value</span>
+          </button>
+        )}
         {onPreview && (
           <button type="button" className="preview-btn" onClick={onPreview} title="Preview the body with dynamic values filled in">
             <EyeIcon />
@@ -204,6 +207,34 @@ function JsonFieldHeader({ label, validity, onBeautify, onExpand, onPreview }) {
         </button>
         {onExpand && <ExpandButton onClick={onExpand} label={label} />}
       </span>
+    </div>
+  );
+}
+
+const GENERATOR_LABEL = {
+  uuid: 'UUID',
+  randomInt: 'Random int',
+  randomString: 'Random string',
+  timestampIso: 'Timestamp (ISO)',
+  timestampMs: 'Timestamp (ms)',
+  email: 'Email',
+};
+
+function DynamicFieldChips({ fields, onRemove }) {
+  if (!fields || fields.length === 0) return null;
+  return (
+    <div className="dyn-chips">
+      <span className="dyn-chips-label">Dynamic:</span>
+      {fields.map((f, i) => {
+        const argsLabel = f.args?.length ? ` (${f.args.join(',')})` : '';
+        return (
+          <span key={`${f.path}-${i}`} className="dyn-chip">
+            <code>{`$.${f.path}`}</code>
+            <span className="dyn-chip-gen">= {GENERATOR_LABEL[f.generator] || f.generator}{argsLabel}</span>
+            <button type="button" onClick={() => onRemove(i)} aria-label="Remove">✕</button>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -343,17 +374,27 @@ function PreviewModal({ open, label, value, dynamicFields, onClose }) {
   );
 }
 
-export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, onRestChange, headers, onHeadersChange }) {
+export function SyntheticForm({ rest, onRestChange, headers, onHeadersChange }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expandedField, setExpandedField] = useState(null);
   const [idPickerOpen, setIdPickerOpen] = useState(false);
   const [previewTarget, setPreviewTarget] = useState(null);
+  const [dynamicPickerOpen, setDynamicPickerOpen] = useState(false);
+
+  const dynamicFields = rest.dynamicFields || [];
 
   const bodyValidity = jsonValidity(rest.body);
-  const payloadValidity = jsonValidity(kafka.payload);
 
   const handleRestChange = (field, value) => onRestChange({ ...rest, [field]: value });
-  const handleKafkaChange = (field, value) => onKafkaChange({ ...kafka, [field]: value });
+
+  const addDynamicField = (field) => {
+    const filtered = dynamicFields.filter((f) => f.path !== field.path);
+    onRestChange({ ...rest, dynamicFields: [...filtered, field] });
+  };
+
+  const removeDynamicField = (index) => {
+    onRestChange({ ...rest, dynamicFields: dynamicFields.filter((_, i) => i !== index) });
+  };
 
   const handleHeaderChange = (index, field, value) => {
     onHeadersChange(headers.map((h, i) => (i === index ? { ...h, [field]: value } : h)));
@@ -368,22 +409,13 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
   };
 
   const expandRest = (key, label, opts = {}) => () =>
-    setExpandedField({ key: `rest.${key}`, label, ...opts });
+    setExpandedField({ key, label, ...opts });
 
-  const expandKafka = (key, label, opts = {}) => () =>
-    setExpandedField({ key: `kafka.${key}`, label, ...opts });
-
-  const expandedValue = (() => {
-    if (!expandedField) return '';
-    const [scope, key] = expandedField.key.split('.');
-    return scope === 'rest' ? rest[key] : kafka[key];
-  })();
+  const expandedValue = expandedField ? rest[expandedField.key] : '';
 
   const handleExpandedChange = (value) => {
     if (!expandedField) return;
-    const [scope, key] = expandedField.key.split('.');
-    if (scope === 'rest') handleRestChange(key, value);
-    else handleKafkaChange(key, value);
+    handleRestChange(expandedField.key, value);
   };
 
   const drawerField = expandedField ? { ...expandedField, value: expandedValue } : null;
@@ -408,106 +440,6 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
   return (
     <>
       <div className="synthetic-form synthetic-form-embedded">
-        <div className="mode-selector" role="radiogroup" aria-label="Injection mode">
-          <button
-            type="button"
-            className={`mode-option ${mode === 'rest' ? 'mode-active' : ''}`}
-            onClick={() => onModeChange('rest')}
-          >
-            REST Controller
-          </button>
-          <button
-            type="button"
-            className={`mode-option ${mode === 'kafka' ? 'mode-active' : ''}`}
-            onClick={() => onModeChange('kafka')}
-          >
-            Kafka
-          </button>
-        </div>
-
-        {mode === 'kafka' ? (
-          <>
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="topic">Kafka Topic</label>
-                <input
-                  id="topic"
-                  type="text"
-                  value={kafka.topic}
-                  onChange={(e) => handleKafkaChange('topic', e.target.value)}
-                  placeholder="my-events-topic"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="eventType">Event Type</label>
-                <input
-                  id="eventType"
-                  type="text"
-                  value={kafka.eventType}
-                  onChange={(e) => handleKafkaChange('eventType', e.target.value)}
-                  placeholder="OrderCreated"
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <FieldLabel
-                htmlFor="expectedFlow"
-                label="Expected Flow"
-                onExpand={expandKafka('expectedFlow', 'Expected Flow', {
-                  eyebrow: 'Kafka',
-                  multiline: true,
-                  placeholder: 'OrderCreated -> OrderValidated -> OrderProcessed -> OrderCompleted',
-                  hint: 'Use arrows to define the expected event sequence',
-                })}
-              />
-              <input
-                id="expectedFlow"
-                type="text"
-                value={kafka.expectedFlow}
-                onChange={(e) => handleKafkaChange('expectedFlow', e.target.value)}
-                placeholder="OrderCreated -> OrderValidated -> OrderProcessed -> OrderCompleted"
-              />
-              <span className="hint">Use arrows to define the expected event sequence</span>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="timeout">Timeout</label>
-                <DurationInput
-                  id="timeout"
-                  valueMs={kafka.timeout}
-                  onChange={(ms) => handleKafkaChange('timeout', ms)}
-                  minMs={1000}
-                />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <JsonFieldHeader
-                label="Payload"
-                validity={payloadValidity}
-                onBeautify={beautifyJson('payload', kafka.payload, (k, v) => handleKafkaChange(k, v))}
-                onExpand={expandKafka('payload', 'Payload (JSON)', {
-                  eyebrow: 'Kafka',
-                  isJson: true,
-                })}
-                onPreview={() => setPreviewTarget({
-                  label: 'Payload (resolved)',
-                  value: kafka.payload,
-                  dynamicFields: [],
-                })}
-              />
-              <JsonEditor
-                value={kafka.payload}
-                onChange={(v) => handleKafkaChange('payload', v)}
-                invalid={payloadValidity === 'invalid'}
-                height={200}
-              />
-            </div>
-          </>
-        ) : (
-          <>
             <div className="form-section">
               <div className="form-section-header form-section-static">
                 <span className="form-section-title">Start Request</span>
@@ -562,6 +494,7 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                       value: rest.body,
                       dynamicFields: rest.dynamicFields || [],
                     })}
+                    onAddDynamic={() => setDynamicPickerOpen(true)}
                   />
                   <JsonEditor
                     value={rest.body}
@@ -569,10 +502,9 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                     invalid={bodyValidity === 'invalid'}
                     height={200}
                   />
-                  <RequestShapePanel
-                    fields={rest.requestFields || []}
-                    dynamicFields={rest.dynamicFields || []}
-                    onChange={(next) => handleRestChange('dynamicFields', next)}
+                  <DynamicFieldChips
+                    fields={dynamicFields}
+                    onRemove={removeDynamicField}
                   />
                 </div>
               </div>
@@ -732,8 +664,6 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                 </div>
               )}
             </div>
-          </>
-        )}
       </div>
 
       <FieldExpandDrawer
@@ -762,6 +692,14 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
         value={previewTarget?.value}
         dynamicFields={previewTarget?.dynamicFields}
         onClose={() => setPreviewTarget(null)}
+      />
+
+      <DynamicValuePicker
+        open={dynamicPickerOpen}
+        body={rest.body}
+        existingPaths={dynamicFields.map((f) => f.path)}
+        onAdd={addDynamicField}
+        onClose={() => setDynamicPickerOpen(false)}
       />
     </>
   );

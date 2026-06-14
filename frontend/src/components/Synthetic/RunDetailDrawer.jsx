@@ -46,7 +46,6 @@ function ResultBlock({ run }) {
   return (
     <>
       {run.mode === 'rest' && <RestSummary result={run.result} />}
-      {run.mode === 'kafka' && <KafkaSummary result={run.result} />}
       <div className="result-section">
         <span className="result-label">Raw Result</span>
         <JsonEditor value={json} readOnly height={360} />
@@ -80,31 +79,6 @@ function RestSummary({ result }) {
         <div className="result-grid-item">
           <span className="grid-label">Matched Value</span>
           <code className="grid-value">{result.matchedValue}</code>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function KafkaSummary({ result }) {
-  return (
-    <div className="result-grid">
-      {result.correlationId && (
-        <div className="result-grid-item">
-          <span className="grid-label">Correlation ID</span>
-          <code className="grid-value">{result.correlationId}</code>
-        </div>
-      )}
-      {Array.isArray(result.completedSteps) && (
-        <div className="result-grid-item">
-          <span className="grid-label">Completed Steps</span>
-          <span className="grid-value">{result.completedSteps.join(' → ') || '—'}</span>
-        </div>
-      )}
-      {Array.isArray(result.missingSteps) && result.missingSteps.length > 0 && (
-        <div className="result-grid-item">
-          <span className="grid-label">Missing Steps</span>
-          <span className="grid-value">{result.missingSteps.join(', ')}</span>
         </div>
       )}
     </div>

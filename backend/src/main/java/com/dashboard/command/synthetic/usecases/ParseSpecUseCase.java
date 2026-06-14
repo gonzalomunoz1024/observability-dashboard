@@ -67,11 +67,11 @@ public class ParseSpecUseCase {
         if (value == null || value.isBlank()) {
             return Mono.error(new IllegalArgumentException("Spec source is required"));
         }
-        Mono<String> content = "url".equalsIgnoreCase(source)
-                ? resolveSpecFromUrl(value.trim())
-                : Mono.just(value);
+        boolean fromUrl = "url".equalsIgnoreCase(source);
+        String specUrl = fromUrl ? value.trim() : null;
+        Mono<String> content = fromUrl ? resolveSpecFromUrl(specUrl) : Mono.just(value);
 
-        return content.map(this::parseString);
+        return content.map(body -> parseString(body, specUrl));
     }
 
     /**
@@ -132,6 +132,33 @@ public class ParseSpecUseCase {
         return null;
     }
 
+    /**
+     * Resolve an OpenAPI `servers.url` against the spec source URL the user
+     * loaded. Many specs ship `servers: [{url: "/"}]` or omit it entirely;
+     * without resolution, a WebClient call ends up on loopback.
+     */
+    private String resolveServerUrl(String serverUrl, String specSourceUrl) {
+        if (serverUrl == null) serverUrl = "";
+        String trimmed = serverUrl.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+        if (specSourceUrl == null) return trimmed;
+        String origin = originOf(specSourceUrl);
+        if (origin == null) return trimmed;
+        if (trimmed.isEmpty() || trimmed.equals("/")) return origin;
+        if (trimmed.startsWith("/")) return origin + trimmed;
+        return origin + "/" + trimmed;
+    }
+
+    private String originOf(String url) {
+        try {
+            URI uri = URI.create(url);
+            if (uri.getScheme() == null || uri.getAuthority() == null) return null;
+            return uri.getScheme() + "://" + uri.getAuthority();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private String resolveUrl(String baseUrl, String target) {
         try {
             URI base = URI.create(baseUrl);
@@ -179,7 +206,7 @@ public class ParseSpecUseCase {
                                 "(e.g., " + base + Arrays.asList("/v3/api-docs", "/openapi.json").get(0) + ").")));
     }
 
-    private ParsedSpecDto parseString(String spec) {
+    private ParsedSpecDto parseString(String spec, String specSourceUrl) {
         ParseOptions options = new ParseOptions();
         options.setResolve(true);
         options.setResolveFully(true);
@@ -193,8 +220,17 @@ public class ParseSpecUseCase {
         }
 
         List<String> servers = api.getServers() != null
-                ? api.getServers().stream().map(Server::getUrl).collect(Collectors.toList())
-                : List.of();
+                ? api.getServers().stream()
+                        .map(s -> resolveServerUrl(s.getUrl(), specSourceUrl))
+                        .filter(s -> s != null && !s.isBlank())
+                        .collect(Collectors.toList())
+                : new ArrayList<>();
+        // No usable servers in the spec? Fall back to the origin we fetched the spec from
+        // so the start/probe URLs come out absolute, not loopback.
+        if (servers.isEmpty() && specSourceUrl != null) {
+            String origin = originOf(specSourceUrl);
+            if (origin != null) servers = List.of(origin);
+        }
 
         List<ParsedOperationDto> ops = new ArrayList<>();
         if (api.getPaths() != null) {
@@ -332,7 +368,9 @@ public class ParseSpecUseCase {
         if ("date".equals(format)) return objectMapper.valueToTree("1970-01-01");
         if ("uuid".equals(format)) return objectMapper.valueToTree("00000000-0000-0000-0000-000000000000");
         if ("email".equals(format)) return objectMapper.valueToTree("user@example.com");
-        return objectMapper.valueToTree("string");
+        // Empty string is a better placeholder than the literal word "string"
+        // — users can tell at a glance that a value still needs filling.
+        return objectMapper.valueToTree("");
     }
 
     /** Walk schema and emit a flat list of leaf-ish fields (objects expanded, arrays not). */

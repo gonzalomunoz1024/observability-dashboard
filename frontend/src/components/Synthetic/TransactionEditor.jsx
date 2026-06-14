@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   SyntheticForm,
-  DEFAULT_KAFKA_CONFIG,
   DEFAULT_REST_CONFIG,
   jsonValidity,
 } from './SyntheticForm';
@@ -31,93 +30,60 @@ function loadInitialState(editing) {
   if (!editing) {
     return {
       name: '',
-      mode: 'rest',
       intervalSeconds: 900,
       enabled: true,
-      kafka: { ...DEFAULT_KAFKA_CONFIG },
       rest: { ...DEFAULT_REST_CONFIG },
       headers: [],
     };
   }
 
   const config = editing.config || {};
-  const mode = editing.mode || 'rest';
   const headers = config.headers
     ? Object.entries(config.headers).map(([key, value]) => ({ key, value: String(value) }))
     : [];
 
-  const rest = mode === 'rest'
-    ? {
-        ...DEFAULT_REST_CONFIG,
-        startUrl: config.startUrl || '',
-        method: config.method || 'POST',
-        body: config.body || '{}',
-        probeUrl: config.probeUrl || '',
-        idJsonPath: config.idJsonPath || '',
-        statusJsonPath: config.statusJsonPath || '$.status',
-        expectedStatusValue: config.expectedStatusValue || '',
-        timeout: config.timeout || 30000,
-        pollInterval: config.pollInterval || 1000,
-        requestFields: Array.isArray(config.requestFields) ? config.requestFields : [],
-        dynamicFields: Array.isArray(config.dynamicFields) ? config.dynamicFields : [],
-      }
-    : { ...DEFAULT_REST_CONFIG };
-
-  const kafka = mode === 'kafka'
-    ? {
-        ...DEFAULT_KAFKA_CONFIG,
-        topic: config.topic || '',
-        eventType: config.eventType || '',
-        expectedFlow: config.expectedFlow || '',
-        timeout: config.timeout || 30000,
-        payload: typeof config.payload === 'object'
-          ? JSON.stringify(config.payload, null, 2)
-          : (config.payload || '{}'),
-      }
-    : { ...DEFAULT_KAFKA_CONFIG };
+  const rest = {
+    ...DEFAULT_REST_CONFIG,
+    startUrl: config.startUrl || '',
+    method: config.method || 'POST',
+    body: config.body || '{}',
+    probeUrl: config.probeUrl || '',
+    idJsonPath: config.idJsonPath || '',
+    statusJsonPath: config.statusJsonPath || '$.status',
+    expectedStatusValue: config.expectedStatusValue || '',
+    timeout: config.timeout || 30000,
+    pollInterval: config.pollInterval || 1000,
+    requestFields: Array.isArray(config.requestFields) ? config.requestFields : [],
+    dynamicFields: Array.isArray(config.dynamicFields) ? config.dynamicFields : [],
+  };
 
   return {
     name: editing.name || '',
-    mode,
     intervalSeconds: editing.intervalSeconds ?? 900,
     enabled: editing.enabled !== false,
-    kafka,
     rest,
     headers,
   };
 }
 
-function buildConfigPayload(mode, rest, kafka, headers) {
-  if (mode === 'rest') {
-    const headerMap = headers.reduce((acc, h) => {
-      if (h.key.trim()) acc[h.key.trim()] = h.value;
-      return acc;
-    }, {});
-    return {
-      startUrl: rest.startUrl.trim(),
-      method: rest.method,
-      body: rest.body,
-      headers: headerMap,
-      probeUrl: rest.probeUrl.trim(),
-      idJsonPath: rest.idJsonPath.trim(),
-      statusJsonPath: rest.statusJsonPath.trim(),
-      expectedStatusValue: rest.expectedStatusValue.trim(),
-      timeout: rest.timeout,
-      pollInterval: rest.pollInterval,
-      requestFields: rest.requestFields || [],
-      dynamicFields: rest.dynamicFields || [],
-    };
-  }
-  let payload = {};
-  try {
-    payload = kafka.payload.trim() ? JSON.parse(kafka.payload) : {};
-  } catch { /* validated below */ }
+function buildConfigPayload(rest, headers) {
+  const headerMap = headers.reduce((acc, h) => {
+    if (h.key.trim()) acc[h.key.trim()] = h.value;
+    return acc;
+  }, {});
   return {
-    topic: kafka.topic.trim(),
-    eventType: kafka.eventType.trim(),
-    expectedFlow: kafka.expectedFlow.trim(),
-    timeout: kafka.timeout,
-    payload,
+    startUrl: rest.startUrl.trim(),
+    method: rest.method,
+    body: rest.body,
+    headers: headerMap,
+    probeUrl: rest.probeUrl.trim(),
+    idJsonPath: rest.idJsonPath.trim(),
+    statusJsonPath: rest.statusJsonPath.trim(),
+    expectedStatusValue: rest.expectedStatusValue.trim(),
+    timeout: rest.timeout,
+    pollInterval: rest.pollInterval,
+    requestFields: rest.requestFields || [],
+    dynamicFields: rest.dynamicFields || [],
   };
 }
 
@@ -126,20 +92,13 @@ function validate(state) {
   if (state.intervalSeconds != null && state.intervalSeconds < 5) {
     return 'Interval must be at least 5 seconds';
   }
-  if (state.mode === 'rest') {
-    if (!state.rest.startUrl.trim()) return 'Start endpoint is required';
-    if (!state.rest.probeUrl.trim()) return 'Probe endpoint is required';
-    if (!state.rest.expectedStatusValue.trim()) return 'Terminal value is required';
-    if (state.rest.probeUrl.includes('{{id}}') && !state.rest.idJsonPath.trim()) {
-      return 'ID extraction path is required when probe URL uses {{id}}';
-    }
-    if (jsonValidity(state.rest.body) === 'invalid') return 'Request body is not valid JSON';
-  } else {
-    if (!state.kafka.topic.trim()) return 'Topic is required';
-    if (!state.kafka.eventType.trim()) return 'Event type is required';
-    if (!state.kafka.expectedFlow.trim()) return 'Expected flow is required';
-    if (jsonValidity(state.kafka.payload) === 'invalid') return 'Payload is not valid JSON';
+  if (!state.rest.startUrl.trim()) return 'Start endpoint is required';
+  if (!state.rest.probeUrl.trim()) return 'Probe endpoint is required';
+  if (!state.rest.expectedStatusValue.trim()) return 'Terminal value is required';
+  if (state.rest.probeUrl.includes('{{id}}') && !state.rest.idJsonPath.trim()) {
+    return 'ID extraction path is required when probe URL uses {{id}}';
   }
+  if (jsonValidity(state.rest.body) === 'invalid') return 'Request body is not valid JSON';
   return null;
 }
 
@@ -191,8 +150,8 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
 
     const payload = {
       name: state.name.trim(),
-      mode: state.mode,
-      config: buildConfigPayload(state.mode, state.rest, state.kafka, state.headers),
+      mode: 'rest',
+      config: buildConfigPayload(state.rest, state.headers),
       intervalSeconds: state.intervalSeconds || null,
       enabled: state.enabled,
     };
@@ -271,30 +230,28 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
         </div>
 
         <div className="tx-editor-body">
-          {state.mode === 'rest' && (
-            <SwaggerSpecPanel
-              startOpKey={startOpKey}
-              probeOpKey={probeOpKey}
-              onPickStart={(op, spec) => {
-                setStartOpKey(`${op.method} ${op.path}`);
-                setStartOp(op);
-                let { rest: nextRest, inference: info } = buildStartPatch(state.rest, op, spec);
-                // If a probe was already chosen, re-derive idJsonPath from the new start response.
-                if (probeOp) {
-                  nextRest = rebindIdPath(nextRest, probeOp, op);
-                }
-                update({ rest: nextRest });
-                setInference(info);
-              }}
-              onPickProbe={(op, spec) => {
-                setProbeOpKey(`${op.method} ${op.path}`);
-                setProbeOp(op);
-                const { rest: nextRest, inference: info } = buildProbePatch(state.rest, op, spec, startOp);
-                update({ rest: nextRest });
-                setInference(info);
-              }}
-            />
-          )}
+          <SwaggerSpecPanel
+            startOpKey={startOpKey}
+            probeOpKey={probeOpKey}
+            onPickStart={(op, spec) => {
+              setStartOpKey(`${op.method} ${op.path}`);
+              setStartOp(op);
+              let { rest: nextRest, inference: info } = buildStartPatch(state.rest, op, spec);
+              // If a probe was already chosen, re-derive idJsonPath from the new start response.
+              if (probeOp) {
+                nextRest = rebindIdPath(nextRest, probeOp, op);
+              }
+              update({ rest: nextRest });
+              setInference(info);
+            }}
+            onPickProbe={(op, spec) => {
+              setProbeOpKey(`${op.method} ${op.path}`);
+              setProbeOp(op);
+              const { rest: nextRest, inference: info } = buildProbePatch(state.rest, op, spec, startOp);
+              update({ rest: nextRest });
+              setInference(info);
+            }}
+          />
 
           {inference && (
             <div className="tx-inference" role="status" aria-live="polite">
@@ -330,10 +287,6 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
             </div>
           )}
           <SyntheticForm
-            mode={state.mode}
-            onModeChange={(mode) => update({ mode })}
-            kafka={state.kafka}
-            onKafkaChange={(kafka) => update({ kafka })}
             rest={state.rest}
             onRestChange={(rest) => update({ rest })}
             headers={state.headers}

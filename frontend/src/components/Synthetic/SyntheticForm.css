@@ -668,6 +668,111 @@
 
 .form-row-url {
   grid-template-columns: 110px 1fr;
+  align-items: end;
+}
+
+/* All form-rows: bottom-align children so inputs line up even when one
+   column's label row is taller (e.g., has a 'pick from response' action). */
+.synthetic-form .form-row {
+  align-items: end;
+}
+
+/* Give plain labels and label-rows the same min-height so adjacent inputs sit
+   at the same baseline whether or not the label has buttons next to it. */
+.synthetic-form .form-group > label,
+.synthetic-form .form-group > .label-row {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+}
+
+.dyn-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dyn-add-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: rgba(0, 122, 255, 0.06);
+}
+
+.dyn-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dyn-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.dyn-chips-label {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-fg-quaternary);
+}
+
+.dyn-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: rgba(0, 122, 255, 0.08);
+  border: 1px solid rgba(0, 122, 255, 0.25);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  color: var(--color-fg-secondary);
+}
+
+.dyn-chip code {
+  font-family: var(--font-family-mono);
+  color: var(--color-accent);
+}
+
+.dyn-chip-gen {
+  color: var(--color-fg-tertiary);
+}
+
+.dyn-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  margin-left: var(--space-1);
+  background: transparent;
+  border: none;
+  color: var(--color-fg-quaternary);
+  cursor: pointer;
+  border-radius: 50%;
+  font-size: 10px;
+  transition: all var(--transition-fast);
+}
+
+.dyn-chip button:hover {
+  color: var(--color-error);
+  background: rgba(255, 59, 48, 0.1);
 }
 
 .headers-label-row {
