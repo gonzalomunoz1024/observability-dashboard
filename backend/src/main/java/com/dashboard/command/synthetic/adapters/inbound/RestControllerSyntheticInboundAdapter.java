@@ -182,7 +182,14 @@ public class RestControllerSyntheticInboundAdapter {
         return parseSpecUseCase.parse(request.getSource(), request.getValue())
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .onErrorResume(e -> Mono.just(ResponseEntity.badRequest()
-                        .body(Map.of("error", e.getMessage()))));
+                        .body(Map.of("error", truncateError(e.getMessage())))));
+    }
+
+    private String truncateError(String message) {
+        if (message == null) return "Unknown error";
+        // Strip raw HTML bodies the swagger parser echoes back on failure.
+        String cleaned = message.replaceAll("(?is)<[^>]+>", " ").replaceAll("\\s+", " ").trim();
+        return cleaned.length() > 300 ? cleaned.substring(0, 300) + "…" : cleaned;
     }
 
     @PostMapping("/template/preview")

@@ -21,13 +21,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -38,24 +43,140 @@ public class ParseSpecUseCase {
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
 
+    // Common spec locations Springdoc / Springfox / FastAPI / etc. expose. Tried
+    // in order when the URL the user pasted returns an HTML Swagger UI page and
+    // we can't extract the underlying spec link.
+    private static final List<String> COMMON_SPEC_PATHS = List.of(
+            "/v3/api-docs", "/v3/api-docs.yaml",
+            "/v2/api-docs", "/v2/api-docs.yaml",
+            "/openapi.json", "/openapi.yaml", "/openapi",
+            "/api-docs", "/api-docs.json", "/api-docs.yaml",
+            "/swagger.json", "/swagger.yaml"
+    );
+
+    private static final Pattern SWAGGER_BUNDLE_URL =
+            Pattern.compile("SwaggerUIBundle\\s*\\(\\s*\\{[^}]*?url\\s*:\\s*['\"]([^'\"]+)['\"]", Pattern.DOTALL);
+    private static final Pattern DATA_URL =
+            Pattern.compile("data-url\\s*=\\s*['\"]([^'\"]+)['\"]");
+    private static final Pattern SPEC_URL_ATTR =
+            Pattern.compile("spec-url\\s*=\\s*['\"]([^'\"]+)['\"]");
+    private static final Pattern SCRIPT_API_DOCS =
+            Pattern.compile("src\\s*=\\s*['\"]([^'\"]*(?:api-docs|openapi)[^'\"]*)['\"]", Pattern.CASE_INSENSITIVE);
+
     public Mono<ParsedSpecDto> parse(String source, String value) {
         if (value == null || value.isBlank()) {
             return Mono.error(new IllegalArgumentException("Spec source is required"));
         }
         Mono<String> content = "url".equalsIgnoreCase(source)
-                ? fetchUrl(value.trim())
+                ? resolveSpecFromUrl(value.trim())
                 : Mono.just(value);
 
         return content.map(this::parseString);
     }
 
-    private Mono<String> fetchUrl(String url) {
+    /**
+     * Fetches the URL. If the response is HTML (Swagger UI / Redoc / etc.),
+     * tries to discover the actual spec URL — first by scraping the HTML for
+     * an embedded `url:` reference, then by probing common spec paths like
+     * `/v3/api-docs`. Returns the spec body when found, an explanatory error
+     * otherwise.
+     */
+    private Mono<String> resolveSpecFromUrl(String url) {
+        return fetchRaw(url).flatMap(body -> {
+            if (!looksLikeHtml(body)) return Mono.just(body);
+
+            String embedded = extractSpecUrl(body);
+            if (embedded != null) {
+                String resolved = resolveUrl(url, embedded);
+                return fetchRaw(resolved).flatMap(specBody ->
+                        looksLikeHtml(specBody)
+                                ? Mono.error(new IllegalArgumentException(
+                                "Spec link in the HTML page also returned HTML: " + resolved))
+                                : Mono.just(specBody));
+            }
+            return probeCommonPaths(url);
+        });
+    }
+
+    private Mono<String> fetchRaw(String url) {
         return webClientBuilder.build()
                 .get()
                 .uri(url)
                 .retrieve()
                 .bodyToMono(String.class)
-                .onErrorMap(e -> new IllegalArgumentException("Failed to fetch spec: " + e.getMessage()));
+                .onErrorMap(e -> new IllegalArgumentException("Failed to fetch " + url + ": " + e.getMessage()));
+    }
+
+    private boolean looksLikeHtml(String body) {
+        if (body == null) return false;
+        String trimmed = body.stripLeading();
+        if (trimmed.length() < 5) return false;
+        String lower = trimmed.substring(0, Math.min(trimmed.length(), 256)).toLowerCase();
+        return lower.startsWith("<!doctype html") || lower.startsWith("<html");
+    }
+
+    private String extractSpecUrl(String html) {
+        for (Pattern p : List.of(SWAGGER_BUNDLE_URL, DATA_URL, SPEC_URL_ATTR, SCRIPT_API_DOCS)) {
+            Matcher m = p.matcher(html);
+            if (m.find()) {
+                String candidate = m.group(1).trim();
+                if (!candidate.isEmpty()
+                        && !candidate.endsWith(".js")
+                        && !candidate.endsWith(".css")
+                        && !candidate.contains("swagger-ui-bundle")
+                        && !candidate.contains("swagger-ui-standalone")) {
+                    return candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String resolveUrl(String baseUrl, String target) {
+        try {
+            URI base = URI.create(baseUrl);
+            URI resolved = base.resolve(target);
+            return resolved.toString();
+        } catch (Exception e) {
+            return target;
+        }
+    }
+
+    private Mono<String> probeCommonPaths(String pageUrl) {
+        URI base;
+        try {
+            URI parsed = URI.create(pageUrl);
+            base = new URI(parsed.getScheme(), parsed.getAuthority(), null, null, null);
+        } catch (Exception e) {
+            return Mono.error(new IllegalArgumentException(
+                    "URL returned HTML and the spec path could not be guessed. " +
+                            "Use the underlying spec URL (e.g., /v3/api-docs)."));
+        }
+
+        List<String> candidates = new ArrayList<>();
+        URI pageBase = URI.create(pageUrl);
+        // First try paths relative to the page URL's directory (useful when the
+        // API is mounted under a subpath like /api/swagger).
+        String pagePath = pageBase.getPath() == null ? "/" : pageBase.getPath();
+        int lastSlash = pagePath.lastIndexOf('/');
+        String prefix = lastSlash >= 0 ? pagePath.substring(0, lastSlash) : "";
+        for (String suffix : COMMON_SPEC_PATHS) {
+            candidates.add(base + prefix + suffix);
+        }
+        // Then absolute paths at the host root.
+        for (String suffix : COMMON_SPEC_PATHS) {
+            candidates.add(base + suffix);
+        }
+
+        return Flux.fromIterable(candidates.stream().distinct().collect(Collectors.toList()))
+                .concatMap(candidate -> fetchRaw(candidate)
+                        .filter(body -> !looksLikeHtml(body))
+                        .onErrorResume(e -> Mono.empty()))
+                .next()
+                .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                        "URL returned an HTML page (looks like Swagger UI / Redoc) and the underlying " +
+                                "spec couldn't be auto-discovered. Try pasting the spec URL directly " +
+                                "(e.g., " + base + Arrays.asList("/v3/api-docs", "/openapi.json").get(0) + ").")));
     }
 
     private ParsedSpecDto parseString(String spec) {
