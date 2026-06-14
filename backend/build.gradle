@@ -54,8 +54,14 @@ dependencies {
     // YAML parsing (for artifact verification)
     implementation 'org.yaml:snakeyaml:2.2'
 
-    // OpenAPI / Swagger parsing
-    implementation 'io.swagger.parser.v3:swagger-parser:2.1.22'
+    // OpenAPI / Swagger parsing.
+    // Use the slim v3-only artifact (no OpenAPI 2.0 compat chain) and drop
+    // Rhino (JS engine used by swagger-parser's JSON Schema validator) since
+    // we don't use server-side schema validation here.
+    implementation('io.swagger.parser.v3:swagger-parser-v3:2.1.22') {
+        exclude group: 'io.swagger', module: 'swagger-compat-spec-parser'
+        exclude group: 'org.mozilla', module: 'rhino'
+    }
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'

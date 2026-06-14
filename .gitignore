@@ -16,9 +16,6 @@
 /backend/.gradle
 /backend/bin
 
-# Bundled local-artifacts JAR exceeds GitHub's 100 MB hard limit; rebuild
-# locally via `local-artifacts/build.sh`. Source is committed; the bundle is not.
-/local-artifacts/dashboard.jar
 /local-artifacts/cli-server/node_modules
 
 # misc
