@@ -332,7 +332,14 @@ function PreviewModal({ open, label, value, dynamicFields, onClose }) {
     setError(null);
     setRendered('');
     previewTemplate(value || '', dynamicFields || [])
-      .then((r) => { if (!cancelled) setRendered(r.rendered ?? ''); })
+      .then((r) => {
+        if (cancelled) return;
+        let text = r.rendered ?? '';
+        // Server returns compact JSON from objectMapper.writeValueAsString —
+        // beautify for the preview so dynamic substitutions are easy to scan.
+        try { text = JSON.stringify(JSON.parse(text), null, 2); } catch { /* not JSON, leave as-is */ }
+        setRendered(text);
+      })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
