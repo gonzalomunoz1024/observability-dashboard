@@ -1,0 +1,23 @@
+.json-editor-wrap {
+  position: relative;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.json-editor-wrap:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.json-editor-invalid {
+  border-color: var(--color-error);
+}
+
+.json-editor-wrap .monaco-editor,
+.json-editor-wrap .monaco-editor-background,
+.json-editor-wrap .monaco-editor .margin {
+  background-color: transparent !important;
+}

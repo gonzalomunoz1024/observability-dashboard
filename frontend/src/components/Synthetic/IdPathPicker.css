@@ -135,6 +135,51 @@
   cursor: not-allowed;
 }
 
+.id-picker-body-preview {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+}
+
+.body-preview-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-5);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--color-fg-tertiary);
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.body-preview-toggle:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-fg-primary);
+}
+
+.body-preview-label {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+
+.body-preview-summary {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  color: var(--color-fg-quaternary);
+}
+
+.body-preview-editor {
+  padding: 0 var(--space-5) var(--space-3);
+}
+
 .id-picker-body {
   flex: 1;
   min-height: 0;

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { probeRequest } from '../../utils/synthetic';
+import { JsonEditor } from './JsonEditor';
 import './IdPathPicker.css';
 
 const SAFE_KEY = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
@@ -236,6 +237,7 @@ export function IdPathPicker({ open, request, value, onChange, onClose, headers 
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
   const [pathInput, setPathInput] = useState(value || '');
+  const [bodyOpen, setBodyOpen] = useState(true);
 
   useEffect(() => {
     if (open) setPathInput(value || '');
@@ -338,6 +340,28 @@ export function IdPathPicker({ open, request, value, onChange, onClose, headers 
           </button>
         </div>
 
+        {request.body != null && (
+          <div className="id-picker-body-preview">
+            <button
+              type="button"
+              className="body-preview-toggle"
+              onClick={() => setBodyOpen((o) => !o)}
+              aria-expanded={bodyOpen}
+            >
+              <ChevronIcon open={bodyOpen} />
+              <span className="body-preview-label">Request body</span>
+              <span className="body-preview-summary">
+                {request.body.trim().length} chars
+              </span>
+            </button>
+            {bodyOpen && (
+              <div className="body-preview-editor">
+                <JsonEditor value={request.body} readOnly height={160} />
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="id-picker-body">
           <div className="id-picker-response">
             <div className="response-meta">
@@ -380,7 +404,12 @@ export function IdPathPicker({ open, request, value, onChange, onClose, headers 
               ) : (
                 <div className="response-raw">
                   <span className="raw-tag">Raw (non-JSON)</span>
-                  <pre>{response.body || response.error || '(empty body)'}</pre>
+                  <JsonEditor
+                    value={response.body || response.error || '(empty body)'}
+                    language="plaintext"
+                    readOnly
+                    height="100%"
+                  />
                 </div>
               )
             )}

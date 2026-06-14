@@ -276,6 +276,45 @@
   background: rgba(0, 122, 255, 0.06);
 }
 
+.duration-input {
+  display: grid;
+  grid-template-columns: 1fr 80px;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.synthetic-form .duration-input input,
+.synthetic-form .duration-input select {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.synthetic-form .duration-input input:focus,
+.synthetic-form .duration-input select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.synthetic-form .duration-input select {
+  font-family: var(--font-family-mono);
+}
+
+.label-text {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
 .form-group-fx-anchor {
   position: relative;
 }

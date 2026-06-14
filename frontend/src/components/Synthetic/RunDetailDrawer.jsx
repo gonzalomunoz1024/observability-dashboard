@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { JsonEditor } from './JsonEditor';
 import './RunDetailDrawer.css';
 
 function CloseIcon() {
@@ -48,7 +49,7 @@ function ResultBlock({ run }) {
       {run.mode === 'kafka' && <KafkaSummary result={run.result} />}
       <div className="result-section">
         <span className="result-label">Raw Result</span>
-        <pre className="result-json">{json}</pre>
+        <JsonEditor value={json} readOnly height={360} />
       </div>
     </>
   );

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { IdPathPicker } from './IdPathPicker';
-import { FxPalette } from './FxPalette';
+import { JsonEditor } from './JsonEditor';
 import { previewTemplate } from '../../utils/synthetic';
 import './SyntheticForm.css';
 
@@ -10,6 +10,7 @@ export const DEFAULT_KAFKA_CONFIG = {
   expectedFlow: '',
   timeout: 30000,
   payload: '{}',
+  dynamicFields: [],
 };
 
 export const DEFAULT_REST_CONFIG = {
@@ -22,7 +23,58 @@ export const DEFAULT_REST_CONFIG = {
   expectedStatusValue: '',
   timeout: 30000,
   pollInterval: 1000,
+  dynamicFields: [],
 };
+
+const DURATION_UNITS = [
+  { label: 'ms',  ms: 1 },
+  { label: 's',   ms: 1000 },
+  { label: 'min', ms: 60_000 },
+  { label: 'hr',  ms: 3_600_000 },
+];
+
+function pickUnit(ms) {
+  if (ms == null || ms === 0) return DURATION_UNITS[1]; // default seconds
+  if (ms % 3_600_000 === 0) return DURATION_UNITS[3];
+  if (ms % 60_000 === 0) return DURATION_UNITS[2];
+  if (ms % 1000 === 0) return DURATION_UNITS[1];
+  return DURATION_UNITS[0];
+}
+
+function DurationInput({ id, valueMs, onChange, units = DURATION_UNITS, minMs = 0 }) {
+  const unit = pickUnit(valueMs);
+  const display = unit.ms === 0 ? 0 : (valueMs ?? 0) / unit.ms;
+
+  const handleValue = (next) => {
+    const num = Number(next);
+    if (Number.isNaN(num)) return;
+    const ms = Math.max(minMs, Math.round(num * unit.ms));
+    onChange(ms);
+  };
+
+  const handleUnit = (label) => {
+    const next = units.find((u) => u.label === label);
+    if (!next) return;
+    // Re-normalize the displayed amount under the new unit, then convert back.
+    onChange(Math.max(minMs, Math.round(display * next.ms)));
+  };
+
+  return (
+    <div className="duration-input">
+      <input
+        id={id}
+        type="number"
+        value={display}
+        onChange={(e) => handleValue(e.target.value)}
+        min={0}
+        step={unit.label === 'ms' ? 100 : 1}
+      />
+      <select value={unit.label} onChange={(e) => handleUnit(e.target.value)}>
+        {units.map((u) => <option key={u.label} value={u.label}>{u.label}</option>)}
+      </select>
+    </div>
+  );
+}
 
 export function jsonValidity(text) {
   const trimmed = (text || '').trim();
@@ -72,11 +124,11 @@ function CloseIcon() {
   );
 }
 
-function FxIcon() {
+function WandIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path
-        d="M2.5 13c1.5 0 2-1 2.5-3.5l1-5C6.5 2 7.5 1.5 9 2M3 8h5M10 6l3 7M13 6l-3 7"
+        d="M11 2l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zM3.5 12.5l6-6 2 2-6 6-2-2z"
         stroke="currentColor"
         strokeWidth="1.4"
         strokeLinecap="round"
@@ -97,20 +149,6 @@ function EyeIcon() {
         strokeLinejoin="round"
       />
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
-  );
-}
-
-function WandIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <path
-        d="M11 2l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zM3.5 12.5l6-6 2 2-6 6-2-2z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }
@@ -140,35 +178,15 @@ function FieldLabel({ htmlFor, label, onExpand }) {
   );
 }
 
-function JsonFieldHeader({
-  htmlFor, label, validity, onBeautify, onExpand,
-  fxRef, onFxToggle, onPreview,
-}) {
+function JsonFieldHeader({ label, validity, onBeautify, onExpand, onPreview }) {
   return (
     <div className="label-row">
-      <label htmlFor={htmlFor}>{label}</label>
+      <span className="label-text">{label}</span>
       <span className="label-row-actions">
         {validity === 'invalid' && <span className="json-chip json-chip-invalid">Invalid JSON</span>}
         {validity === 'valid' && <span className="json-chip json-chip-valid">JSON</span>}
-        {onFxToggle && (
-          <button
-            ref={fxRef}
-            type="button"
-            className="fx-btn"
-            onClick={onFxToggle}
-            title="Insert dynamic value"
-          >
-            <FxIcon />
-            <span>fx</span>
-          </button>
-        )}
         {onPreview && (
-          <button
-            type="button"
-            className="preview-btn"
-            onClick={onPreview}
-            title="Preview rendered template"
-          >
+          <button type="button" className="preview-btn" onClick={onPreview} title="Preview the body with dynamic values filled in">
             <EyeIcon />
             <span>Preview</span>
           </button>
@@ -184,61 +202,6 @@ function JsonFieldHeader({
         </button>
         {onExpand && <ExpandButton onClick={onExpand} label={label} />}
       </span>
-    </div>
-  );
-}
-
-function PreviewModal({ open, label, value, onClose }) {
-  const [rendered, setRendered] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setRendered('');
-    previewTemplate(value || '')
-      .then((r) => { if (!cancelled) setRendered(r.rendered ?? ''); })
-      .catch((err) => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [open, value]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return (
-    <div className="preview-overlay" onClick={onClose}>
-      <div className="preview-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="preview-header">
-          <div className="preview-title-group">
-            <span className="preview-eyebrow">Preview</span>
-            <h3 className="preview-title">{label}</h3>
-          </div>
-          <button type="button" className="preview-close" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-        <div className="preview-body">
-          {loading ? (
-            <p className="preview-placeholder">Rendering…</p>
-          ) : error ? (
-            <p className="preview-error">{error}</p>
-          ) : (
-            <pre className="preview-output">{rendered}</pre>
-          )}
-        </div>
-        <div className="preview-footer">
-          <span className="preview-hint">One sample render. Values change each run.</span>
-          <button type="button" className="preview-done" onClick={onClose}>Done</button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -285,9 +248,16 @@ function FieldExpandDrawer({ field, onChange, onClose }) {
           </div>
         </div>
         <div className="field-drawer-body">
-          {field.multiline ? (
+          {field.isJson ? (
+            <JsonEditor
+              value={field.value}
+              onChange={(v) => onChange(v)}
+              invalid={validity === 'invalid'}
+              height="100%"
+            />
+          ) : field.multiline ? (
             <textarea
-              className={`field-drawer-textarea ${field.isJson && validity === 'invalid' ? 'json-invalid' : ''}`}
+              className="field-drawer-textarea"
               value={field.value}
               onChange={(e) => onChange(e.target.value)}
               placeholder={field.placeholder}
@@ -316,17 +286,66 @@ function FieldExpandDrawer({ field, onChange, onClose }) {
   );
 }
 
+function PreviewModal({ open, label, value, onClose }) {
+  const [rendered, setRendered] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setRendered('');
+    previewTemplate(value || '')
+      .then((r) => { if (!cancelled) setRendered(r.rendered ?? ''); })
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="preview-header">
+          <div className="preview-title-group">
+            <span className="preview-eyebrow">Sample render</span>
+            <h3 className="preview-title">{label}</h3>
+          </div>
+          <button type="button" className="preview-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="preview-body">
+          {loading ? (
+            <p className="preview-placeholder">Rendering…</p>
+          ) : error ? (
+            <p className="preview-error">{error}</p>
+          ) : (
+            <JsonEditor value={rendered} readOnly height={420} />
+          )}
+        </div>
+        <div className="preview-footer">
+          <span className="preview-hint">One sample render. Values change each run.</span>
+          <button type="button" className="preview-done" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, onRestChange, headers, onHeadersChange }) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expandedField, setExpandedField] = useState(null);
   const [idPickerOpen, setIdPickerOpen] = useState(false);
-  const [fxTarget, setFxTarget] = useState(null);
   const [previewTarget, setPreviewTarget] = useState(null);
-
-  const restBodyRef = useRef(null);
-  const restBodyFxRef = useRef(null);
-  const kafkaPayloadRef = useRef(null);
-  const kafkaPayloadFxRef = useRef(null);
 
   const bodyValidity = jsonValidity(rest.body);
   const payloadValidity = jsonValidity(kafka.payload);
@@ -344,31 +363,6 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
     try {
       setter(field, JSON.stringify(JSON.parse(source), null, 2));
     } catch { /* no-op */ }
-  };
-
-  const insertAtCursor = (textareaRef, current, token, applyChange) => {
-    const el = textareaRef.current;
-    if (!el) {
-      applyChange((current || '') + token);
-      return;
-    }
-    const start = el.selectionStart ?? current.length;
-    const end = el.selectionEnd ?? current.length;
-    const next = (current || '').slice(0, start) + token + (current || '').slice(end);
-    applyChange(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      const pos = start + token.length;
-      el.setSelectionRange(pos, pos);
-    });
-  };
-
-  const handleInsertToken = (token) => {
-    if (fxTarget === 'restBody') {
-      insertAtCursor(restBodyRef, rest.body, token, (v) => handleRestChange('body', v));
-    } else if (fxTarget === 'kafkaPayload') {
-      insertAtCursor(kafkaPayloadRef, kafka.payload, token, (v) => handleKafkaChange('payload', v));
-    }
   };
 
   const expandRest = (key, label, opts = {}) => () =>
@@ -397,7 +391,15 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
     return acc;
   }, {});
 
-  const pollingSummary = `${rest.timeout / 1000}s timeout · poll ${rest.pollInterval}ms${
+  const formatDuration = (ms) => {
+    if (!ms) return '0s';
+    if (ms % 3_600_000 === 0) return `${ms / 3_600_000}hr`;
+    if (ms % 60_000 === 0) return `${ms / 60_000}min`;
+    if (ms % 1000 === 0) return `${ms / 1000}s`;
+    return `${ms}ms`;
+  };
+
+  const pollingSummary = `${formatDuration(rest.timeout)} timeout · poll ${formatDuration(rest.pollInterval)}${
     headers.length > 0 ? ` · ${headers.length} header${headers.length > 1 ? 's' : ''}` : ''
   }`;
 
@@ -469,49 +471,35 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
 
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="timeout">Timeout (ms)</label>
-                <input
+                <label htmlFor="timeout">Timeout</label>
+                <DurationInput
                   id="timeout"
-                  type="number"
-                  value={kafka.timeout}
-                  onChange={(e) => handleKafkaChange('timeout', parseInt(e.target.value, 10) || 0)}
-                  min="5000"
-                  step="5000"
+                  valueMs={kafka.timeout}
+                  onChange={(ms) => handleKafkaChange('timeout', ms)}
+                  minMs={1000}
                 />
               </div>
             </div>
 
-            <div className="form-group form-group-fx-anchor">
+            <div className="form-group">
               <JsonFieldHeader
-                htmlFor="payload"
-                label="Payload (JSON)"
+                label="Payload"
                 validity={payloadValidity}
                 onBeautify={beautifyJson('payload', kafka.payload, (k, v) => handleKafkaChange(k, v))}
                 onExpand={expandKafka('payload', 'Payload (JSON)', {
                   eyebrow: 'Kafka',
-                  multiline: true,
                   isJson: true,
-                  placeholder: '{"orderId": "12345", "amount": 99.99}',
                 })}
-                fxRef={kafkaPayloadFxRef}
-                onFxToggle={() => setFxTarget(fxTarget === 'kafkaPayload' ? null : 'kafkaPayload')}
-                onPreview={() => setPreviewTarget({ label: 'Payload (JSON)', value: kafka.payload })}
+                onPreview={() => setPreviewTarget({
+                  label: 'Payload (resolved)',
+                  value: kafka.payload,
+                })}
               />
-              <FxPalette
-                open={fxTarget === 'kafkaPayload'}
-                anchorRef={kafkaPayloadFxRef}
-                onInsert={handleInsertToken}
-                onClose={() => setFxTarget(null)}
-              />
-              <textarea
-                id="payload"
-                ref={kafkaPayloadRef}
-                className={payloadValidity === 'invalid' ? 'json-invalid' : ''}
+              <JsonEditor
                 value={kafka.payload}
-                onChange={(e) => handleKafkaChange('payload', e.target.value)}
-                placeholder='{"orderId": "12345", "amount": 99.99}'
-                rows={4}
-                spellCheck={false}
+                onChange={(v) => handleKafkaChange('payload', v)}
+                invalid={payloadValidity === 'invalid'}
+                height={200}
               />
             </div>
           </>
@@ -557,37 +545,25 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                   </div>
                 </div>
 
-                <div className="form-group form-group-last form-group-fx-anchor">
+                <div className="form-group form-group-last">
                   <JsonFieldHeader
-                    htmlFor="restBody"
-                    label="Request Body (JSON)"
+                    label="Request Body"
                     validity={bodyValidity}
                     onBeautify={beautifyJson('body', rest.body, (k, v) => handleRestChange(k, v))}
                     onExpand={expandRest('body', 'Request Body (JSON)', {
                       eyebrow: 'Start Request',
-                      multiline: true,
                       isJson: true,
-                      placeholder: '{"orderId": "12345", "amount": 99.99}',
                     })}
-                    fxRef={restBodyFxRef}
-                    onFxToggle={() => setFxTarget(fxTarget === 'restBody' ? null : 'restBody')}
-                    onPreview={() => setPreviewTarget({ label: 'Request Body (JSON)', value: rest.body })}
+                    onPreview={() => setPreviewTarget({
+                      label: 'Request Body (resolved)',
+                      value: rest.body,
+                    })}
                   />
-                  <FxPalette
-                    open={fxTarget === 'restBody'}
-                    anchorRef={restBodyFxRef}
-                    onInsert={handleInsertToken}
-                    onClose={() => setFxTarget(null)}
-                  />
-                  <textarea
-                    id="restBody"
-                    ref={restBodyRef}
-                    className={bodyValidity === 'invalid' ? 'json-invalid' : ''}
+                  <JsonEditor
                     value={rest.body}
-                    onChange={(e) => handleRestChange('body', e.target.value)}
-                    placeholder='{"orderId": "12345", "amount": 99.99}'
-                    rows={3}
-                    spellCheck={false}
+                    onChange={(v) => handleRestChange('body', v)}
+                    invalid={bodyValidity === 'invalid'}
+                    height={200}
                   />
                 </div>
               </div>
@@ -690,25 +666,21 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                 <div className="form-section-body animate-fade-in">
                   <div className="form-row">
                     <div className="form-group">
-                      <label htmlFor="restTimeout">Timeout (ms)</label>
-                      <input
+                      <label htmlFor="restTimeout">Timeout</label>
+                      <DurationInput
                         id="restTimeout"
-                        type="number"
-                        value={rest.timeout}
-                        onChange={(e) => handleRestChange('timeout', parseInt(e.target.value, 10) || 0)}
-                        min="1000"
-                        step="1000"
+                        valueMs={rest.timeout}
+                        onChange={(ms) => handleRestChange('timeout', ms)}
+                        minMs={1000}
                       />
                     </div>
                     <div className="form-group">
-                      <label htmlFor="pollInterval">Poll Interval (ms)</label>
-                      <input
+                      <label htmlFor="pollInterval">Poll Interval</label>
+                      <DurationInput
                         id="pollInterval"
-                        type="number"
-                        value={rest.pollInterval}
-                        onChange={(e) => handleRestChange('pollInterval', parseInt(e.target.value, 10) || 0)}
-                        min="250"
-                        step="250"
+                        valueMs={rest.pollInterval}
+                        onChange={(ms) => handleRestChange('pollInterval', ms)}
+                        minMs={250}
                       />
                     </div>
                   </div>
