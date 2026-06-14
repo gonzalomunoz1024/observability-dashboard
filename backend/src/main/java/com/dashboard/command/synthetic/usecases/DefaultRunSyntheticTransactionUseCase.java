@@ -83,6 +83,14 @@ public class DefaultRunSyntheticTransactionUseCase implements RunSyntheticTransa
                 .timeout(longOr(config, "timeout", 30000))
                 .pollInterval(longOr(config, "pollInterval", 1000))
                 .dynamicFields(dynamicFields)
+                .onProgress(partial -> {
+                    try {
+                        String partialJson = objectMapper.writeValueAsString(partial);
+                        runRepository.updateProgress(run.getId(), partialJson).subscribe();
+                    } catch (Exception e) {
+                        log.debug("Failed to persist run progress for {}: {}", run.getId(), e.getMessage());
+                    }
+                })
                 .build();
 
         return restInjectAndProbeUseCase.execute(command)

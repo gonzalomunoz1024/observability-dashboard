@@ -8,6 +8,7 @@ import {
 } from '../../utils/synthetic';
 import { TransactionEditor } from './TransactionEditor';
 import { RunFlow } from './RunFlow';
+import { JsonEditor } from './JsonEditor';
 import './SyntheticPanel.css';
 
 const RUNS_POLL_MS = 2000;
@@ -474,6 +475,18 @@ function RunDetailPane({ run, runs, selectedRunId, transactions }) {
         </div>
       )}
 
+      <ResponsePanel
+        title="Start response"
+        statusCode={r.result?.startStatusCode}
+        body={r.result?.startResponseSnippet}
+      />
+      <ResponsePanel
+        title="Last probe response"
+        statusCode={r.result?.lastStatusCode}
+        body={r.result?.lastResponseSnippet}
+        meta={r.result?.attempts ? `attempt ${r.result.attempts}` : null}
+      />
+
       {json && (
         <details className="runs-detail-raw">
           <summary>Raw result</summary>
@@ -481,5 +494,45 @@ function RunDetailPane({ run, runs, selectedRunId, transactions }) {
         </details>
       )}
     </div>
+  );
+}
+
+function ResponsePanel({ title, statusCode, body, meta }) {
+  if (!body && (statusCode == null || statusCode === 0)) return null;
+
+  const isJson = (() => {
+    if (!body) return false;
+    const t = body.trim();
+    if (!t.startsWith('{') && !t.startsWith('[')) return false;
+    try { JSON.parse(t); return true; } catch { return false; }
+  })();
+
+  const formatted = isJson ? JSON.stringify(JSON.parse(body), null, 2) : (body ?? '');
+  const language = isJson ? 'json' : 'plaintext';
+
+  let statusClass = '';
+  if (statusCode != null) {
+    if (statusCode < 0) statusClass = 'response-code-err';
+    else if (statusCode >= 200 && statusCode < 300) statusClass = 'response-code-ok';
+    else statusClass = 'response-code-warn';
+  }
+
+  return (
+    <details className="runs-detail-response" open={statusCode != null && statusCode >= 400}>
+      <summary>
+        <span className="response-title">{title}</span>
+        {statusCode != null && statusCode !== 0 && (
+          <span className={`response-code ${statusClass}`}>
+            {statusCode < 0 ? 'connection error' : `HTTP ${statusCode}`}
+          </span>
+        )}
+        {meta && <span className="response-meta">{meta}</span>}
+      </summary>
+      {body && (
+        <div className="runs-detail-response-body">
+          <JsonEditor value={formatted} readOnly height={260} language={language} />
+        </div>
+      )}
+    </details>
   );
 }

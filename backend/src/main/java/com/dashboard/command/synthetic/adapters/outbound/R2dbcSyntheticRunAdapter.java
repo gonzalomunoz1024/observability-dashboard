@@ -66,6 +66,14 @@ public class R2dbcSyntheticRunAdapter implements SyntheticRunRepositoryPort {
     }
 
     @Override
+    public Mono<Void> updateProgress(Long id, String result) {
+        return databaseClient.sql("UPDATE synthetic_runs SET result = :result WHERE id = :id")
+                .bind("id", id)
+                .bind("result", result != null ? result : "")
+                .then();
+    }
+
+    @Override
     public Mono<SyntheticRun> findById(Long id) {
         return databaseClient.sql("SELECT * FROM synthetic_runs WHERE id = :id")
                 .bind("id", id)

@@ -53,8 +53,9 @@ public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCa
                                                       HttpProbeResponse startResponse,
                                                       Map<String, String> resolvedHeaders, long startTime) {
         if (startResponse.getStatusCode() < 200 || startResponse.getStatusCode() >= 300) {
-            return Mono.just(errorResult(command, startResponse, null,
-                    "Start endpoint returned status " + startResponse.getStatusCode(), startTime));
+            RestCheckResult err = errorResult(command, startResponse, null,
+                    "Start endpoint returned status " + startResponse.getStatusCode(), startTime);
+            return Mono.just(err);
         }
 
         String extractedId = null;
@@ -72,12 +73,27 @@ public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCa
             }
         }
 
+        // Emit a snapshot so the UI flips the Start node to ok and the Probe
+        // node to running immediately, instead of waiting for the whole poll
+        // loop to finish.
+        emitProgress(command, buildResult(command, "running", extractedId, startResponse,
+                0, null, null, null, System.currentTimeMillis() - startTime));
+
         long pollInterval = Math.max(command.getPollInterval(), MIN_POLL_INTERVAL);
         AtomicInteger attempts = new AtomicInteger();
         AtomicReference<HttpProbeResponse> lastResponse = new AtomicReference<>();
 
         return pollProbe(command, probeUrl, extractedId, startResponse, resolvedHeaders,
                 pollInterval, startTime, attempts, lastResponse);
+    }
+
+    private void emitProgress(RestInjectCommand command, RestCheckResult partial) {
+        if (command.getOnProgress() == null) return;
+        try {
+            command.getOnProgress().accept(partial);
+        } catch (Exception e) {
+            log.debug("Progress callback failed: {}", e.getMessage());
+        }
     }
 
     private Mono<RestCheckResult> pollProbe(RestInjectCommand command, String probeUrl,
@@ -106,6 +122,11 @@ public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCa
                         return Mono.just(buildResult(command, "timeout", extractedId, startResponse,
                                 attempts.get(), response, null, null, elapsed));
                     }
+
+                    // Mid-flight snapshot so the run row reflects each poll
+                    // as it happens — attempts count, last status code, etc.
+                    emitProgress(command, buildResult(command, "running", extractedId, startResponse,
+                            attempts.get(), response, matchedValue, null, elapsed));
 
                     return Mono.delay(Duration.ofMillis(pollInterval))
                             .flatMap(tick -> pollProbe(command, probeUrl, extractedId, startResponse,
