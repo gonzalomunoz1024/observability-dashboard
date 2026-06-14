@@ -26,18 +26,23 @@ public class SyntheticTransactionScheduler {
     public void runDue() {
         Instant now = Instant.now();
         txRepository.findDue(now)
-                .flatMap(tx -> runUseCase.run(tx, "scheduled")
-                        .doOnNext(run -> {
-                            Instant nextRunAt = tx.getIntervalSeconds() != null
-                                    ? Instant.now().plusSeconds(tx.getIntervalSeconds())
-                                    : null;
-                            txRepository.updateRunTracking(tx.getId(), run.getStartedAt(),
-                                    nextRunAt, run.getStatus()).subscribe();
-                        })
-                        .onErrorResume(e -> {
-                            log.error("Scheduled run failed for tx {}: {}", tx.getId(), e.getMessage());
-                            return reactor.core.publisher.Mono.empty();
-                        }))
+                .flatMap(tx -> {
+                    // Claim the next slot synchronously so the next 10-second
+                    // tick doesn't see this transaction as still due and
+                    // re-fire it while the current run is still in flight.
+                    Instant nextRunAt = tx.getIntervalSeconds() != null
+                            ? Instant.now().plusSeconds(tx.getIntervalSeconds())
+                            : null;
+                    return txRepository.updateNextRunAt(tx.getId(), nextRunAt)
+                            .then(runUseCase.run(tx, "scheduled"))
+                            .flatMap(run -> txRepository.updateRunTracking(
+                                    tx.getId(), run.getStartedAt(), nextRunAt, run.getStatus())
+                                    .thenReturn(run))
+                            .onErrorResume(e -> {
+                                log.error("Scheduled run failed for tx {}: {}", tx.getId(), e.getMessage());
+                                return reactor.core.publisher.Mono.empty();
+                            });
+                })
                 .subscribe();
     }
 }

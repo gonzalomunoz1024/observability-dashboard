@@ -13,5 +13,7 @@ public interface SyntheticTransactionRepositoryPort {
     Flux<SyntheticTransaction> findAll();
     Flux<SyntheticTransaction> findDue(Instant now);
     Mono<Void> updateRunTracking(Long id, Instant lastRunAt, Instant nextRunAt, String lastStatus);
+    /** Bump only next_run_at — used to claim a scheduling slot before kicking off the run. */
+    Mono<Void> updateNextRunAt(Long id, Instant nextRunAt);
     Mono<Void> deleteById(Long id);
 }

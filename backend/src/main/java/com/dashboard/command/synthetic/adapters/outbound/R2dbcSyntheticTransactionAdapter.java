@@ -126,6 +126,14 @@ public class R2dbcSyntheticTransactionAdapter implements SyntheticTransactionRep
     }
 
     @Override
+    public Mono<Void> updateNextRunAt(Long id, Instant nextRunAt) {
+        return databaseClient.sql("UPDATE synthetic_transactions SET next_run_at = :nextRunAt WHERE id = :id")
+                .bind("id", id)
+                .bind("nextRunAt", nextRunAt != null ? LocalDateTime.ofInstant(nextRunAt, ZoneOffset.UTC) : LocalDateTime.MIN)
+                .then();
+    }
+
+    @Override
     public Mono<Void> deleteById(Long id) {
         return databaseClient.sql("DELETE FROM synthetic_transactions WHERE id = :id")
                 .bind("id", id)
