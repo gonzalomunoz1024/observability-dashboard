@@ -234,6 +234,197 @@
   cursor: not-allowed;
 }
 
+.field-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-quaternary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.field-expand-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-bg-elevated);
+}
+
+.field-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.18s ease-out;
+}
+
+.field-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(720px, 92vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-elevated);
+  border-left: 1px solid var(--color-border-subtle);
+  box-shadow: -24px 0 48px rgba(0, 0, 0, 0.18);
+  animation: drawerSlideIn 0.22s cubic-bezier(0.32, 0.72, 0.2, 1);
+}
+
+@keyframes drawerSlideIn {
+  from { transform: translateX(24px); opacity: 0.4; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.field-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.field-drawer-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.field-drawer-eyebrow {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-fg-quaternary);
+}
+
+.field-drawer-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-fg-primary);
+  letter-spacing: -0.01em;
+}
+
+.field-drawer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.field-drawer-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--color-fg-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.field-drawer-close:hover {
+  color: var(--color-fg-primary);
+  background: var(--color-bg-tertiary);
+}
+
+.field-drawer-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-6);
+  gap: var(--space-3);
+}
+
+.field-drawer-input,
+.field-drawer-textarea {
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-fg-primary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-mono);
+  box-sizing: border-box;
+}
+
+.field-drawer-input {
+  font-family: inherit;
+  font-size: var(--font-size-md);
+}
+
+.field-drawer-textarea {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  line-height: 1.55;
+}
+
+.field-drawer-input:focus,
+.field-drawer-textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.field-drawer-textarea.json-invalid {
+  border-color: var(--color-error);
+}
+
+.field-drawer-hint {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-quaternary);
+}
+
+.field-drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.field-drawer-hotkey {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-quaternary);
+  font-family: var(--font-family-mono);
+}
+
+.field-drawer-done {
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.field-drawer-done:hover {
+  background: var(--color-accent-hover);
+}
+
 .synthetic-form .form-group textarea.json-invalid {
   border-color: var(--color-error);
 }

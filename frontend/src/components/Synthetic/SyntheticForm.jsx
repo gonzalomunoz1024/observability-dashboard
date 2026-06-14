@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { injectAndTrace, restInjectAndCheck } from '../../utils/synthetic';
 import './SyntheticForm.css';
 
@@ -65,7 +65,54 @@ function Chevron({ open }) {
   );
 }
 
-function JsonFieldHeader({ htmlFor, label, validity, onBeautify }) {
+function ExpandIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M9.5 2.5h4v4M13.5 2.5L8.5 7.5M6.5 13.5h-4v-4M2.5 13.5l5-5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ExpandButton({ onClick, label }) {
+  return (
+    <button
+      type="button"
+      className="field-expand-btn"
+      onClick={onClick}
+      aria-label={`Expand ${label}`}
+      title={`Expand ${label}`}
+    >
+      <ExpandIcon />
+    </button>
+  );
+}
+
+function FieldLabel({ htmlFor, label, onExpand }) {
+  return (
+    <div className="label-row">
+      <label htmlFor={htmlFor}>{label}</label>
+      <span className="label-row-actions">
+        <ExpandButton onClick={onExpand} label={label} />
+      </span>
+    </div>
+  );
+}
+
+function JsonFieldHeader({ htmlFor, label, validity, onBeautify, onExpand }) {
   return (
     <div className="label-row">
       <label htmlFor={htmlFor}>{label}</label>
@@ -81,7 +128,104 @@ function JsonFieldHeader({ htmlFor, label, validity, onBeautify }) {
         >
           Beautify
         </button>
+        {onExpand && <ExpandButton onClick={onExpand} label={label} />}
       </span>
+    </div>
+  );
+}
+
+function FieldExpandDrawer({ field, onChange, onClose }) {
+  useEffect(() => {
+    if (!field) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [field, onClose]);
+
+  if (!field) return null;
+
+  const validity = field.isJson ? jsonValidity(field.value) : null;
+
+  const handleBeautify = () => {
+    try {
+      onChange(JSON.stringify(JSON.parse(field.value), null, 2));
+    } catch {
+      /* keep current value if invalid */
+    }
+  };
+
+  return (
+    <div className="field-drawer-overlay" onClick={onClose}>
+      <div className="field-drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="field-drawer-header">
+          <div className="field-drawer-title-group">
+            {field.eyebrow && <span className="field-drawer-eyebrow">{field.eyebrow}</span>}
+            <h2 className="field-drawer-title">{field.label}</h2>
+          </div>
+          <div className="field-drawer-actions">
+            {field.isJson && (
+              <>
+                {validity === 'invalid' && (
+                  <span className="json-chip json-chip-invalid">Invalid JSON</span>
+                )}
+                {validity === 'valid' && (
+                  <span className="json-chip json-chip-valid">JSON</span>
+                )}
+                <button
+                  type="button"
+                  className="beautify-btn"
+                  onClick={handleBeautify}
+                  disabled={validity !== 'valid'}
+                  title="Format JSON"
+                >
+                  Beautify
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className="field-drawer-close"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        </div>
+        <div className="field-drawer-body">
+          {field.multiline ? (
+            <textarea
+              className={`field-drawer-textarea ${
+                field.isJson && validity === 'invalid' ? 'json-invalid' : ''
+              }`}
+              value={field.value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={field.placeholder}
+              spellCheck={false}
+              autoFocus
+            />
+          ) : (
+            <input
+              className="field-drawer-input"
+              type={field.type || 'text'}
+              value={field.value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={field.placeholder}
+              spellCheck={false}
+              autoFocus
+            />
+          )}
+          {field.hint && <p className="field-drawer-hint">{field.hint}</p>}
+        </div>
+        <div className="field-drawer-footer">
+          <span className="field-drawer-hotkey">Esc to close</span>
+          <button type="button" className="field-drawer-done" onClick={onClose}>
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -94,6 +238,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [expandedField, setExpandedField] = useState(null);
 
   const bodyValidity = jsonValidity(restData.body);
   const payloadValidity = jsonValidity(formData.payload);
@@ -126,6 +271,43 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
         return prev;
       }
     });
+  };
+
+  const expandRest = (key, label, opts = {}) => () =>
+    setExpandedField({
+      key: `rest.${key}`,
+      label,
+      eyebrow: opts.eyebrow,
+      multiline: opts.multiline ?? false,
+      isJson: opts.isJson ?? false,
+      type: opts.type,
+      placeholder: opts.placeholder,
+      hint: opts.hint,
+    });
+
+  const expandKafka = (key, label, opts = {}) => () =>
+    setExpandedField({
+      key: `kafka.${key}`,
+      label,
+      eyebrow: opts.eyebrow,
+      multiline: opts.multiline ?? false,
+      isJson: opts.isJson ?? false,
+      type: opts.type,
+      placeholder: opts.placeholder,
+      hint: opts.hint,
+    });
+
+  const expandedValue = (() => {
+    if (!expandedField) return '';
+    const [scope, key] = expandedField.key.split('.');
+    return scope === 'rest' ? restData[key] : formData[key];
+  })();
+
+  const handleExpandedChange = (value) => {
+    if (!expandedField) return;
+    const [scope, key] = expandedField.key.split('.');
+    if (scope === 'rest') handleRestChange(key, value);
+    else handleChange(key, value);
   };
 
   const handleKafkaSubmit = async () => {
@@ -208,9 +390,14 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
     headers.length > 0 ? ` · ${headers.length} header${headers.length > 1 ? 's' : ''}` : ''
   }`;
 
+  const drawerField = expandedField
+    ? { ...expandedField, value: expandedValue }
+    : null;
+
   return (
-    <form className="synthetic-form" onSubmit={handleSubmit}>
-      <h3>Inject Synthetic Transaction</h3>
+    <>
+      <form className="synthetic-form" onSubmit={handleSubmit}>
+        <h3>Inject Synthetic Transaction</h3>
 
       <div className="mode-selector" role="radiogroup" aria-label="Injection mode">
         <button
@@ -258,7 +445,16 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
           </div>
 
           <div className="form-group">
-            <label htmlFor="expectedFlow">Expected Flow</label>
+            <FieldLabel
+              htmlFor="expectedFlow"
+              label="Expected Flow"
+              onExpand={expandKafka('expectedFlow', 'Expected Flow', {
+                eyebrow: 'Kafka',
+                multiline: true,
+                placeholder: 'OrderCreated -> OrderValidated -> OrderProcessed -> OrderCompleted',
+                hint: 'Use arrows to define the expected event sequence',
+              })}
+            />
             <input
               id="expectedFlow"
               type="text"
@@ -290,6 +486,12 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
               label="Payload (JSON)"
               validity={payloadValidity}
               onBeautify={beautify('payload', setFormData)}
+              onExpand={expandKafka('payload', 'Payload (JSON)', {
+                eyebrow: 'Kafka',
+                multiline: true,
+                isJson: true,
+                placeholder: '{"orderId": "12345", "amount": 99.99}',
+              })}
             />
             <textarea
               id="payload"
@@ -326,7 +528,15 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="startUrl">Start Endpoint</label>
+                  <FieldLabel
+                    htmlFor="startUrl"
+                    label="Start Endpoint"
+                    onExpand={expandRest('startUrl', 'Start Endpoint', {
+                      eyebrow: 'Start Request',
+                      type: 'url',
+                      placeholder: 'https://api.example.com/orders',
+                    })}
+                  />
                   <input
                     id="startUrl"
                     type="url"
@@ -344,6 +554,12 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
                   label="Request Body (JSON)"
                   validity={bodyValidity}
                   onBeautify={beautify('body', setRestData)}
+                  onExpand={expandRest('body', 'Request Body (JSON)', {
+                    eyebrow: 'Start Request',
+                    multiline: true,
+                    isJson: true,
+                    placeholder: '{"orderId": "12345", "amount": 99.99}',
+                  })}
                 />
                 <textarea
                   id="restBody"
@@ -369,7 +585,15 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
             </div>
             <div className="form-section-body">
               <div className="form-group">
-                <label htmlFor="probeUrl">Probe Endpoint</label>
+                <FieldLabel
+                  htmlFor="probeUrl"
+                  label="Probe Endpoint"
+                  onExpand={expandRest('probeUrl', 'Probe Endpoint', {
+                    eyebrow: 'Status Probe',
+                    placeholder: 'https://api.example.com/orders/{{id}}/status',
+                    hint: 'Use {{id}} where the ID extracted from the start response should go',
+                  })}
+                />
                 <input
                   id="probeUrl"
                   type="text"
@@ -519,5 +743,12 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
         </span>
       </button>
     </form>
+
+      <FieldExpandDrawer
+        field={drawerField}
+        onChange={handleExpandedChange}
+        onClose={() => setExpandedField(null)}
+      />
+    </>
   );
 }
