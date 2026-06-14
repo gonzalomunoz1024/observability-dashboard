@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { IdPathPicker } from './IdPathPicker';
+import { TerminalPathPicker } from './TerminalPathPicker';
 import { JsonEditor } from './JsonEditor';
 import { DynamicValuePicker } from './DynamicValuePicker';
 import { previewTemplate } from '../../utils/synthetic';
@@ -386,6 +387,7 @@ export function SyntheticForm({ rest, onRestChange, headers, onHeadersChange }) 
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expandedField, setExpandedField] = useState(null);
   const [idPickerOpen, setIdPickerOpen] = useState(false);
+  const [terminalPickerOpen, setTerminalPickerOpen] = useState(false);
   const [previewTarget, setPreviewTarget] = useState(null);
   const [dynamicPickerOpen, setDynamicPickerOpen] = useState(false);
 
@@ -579,7 +581,20 @@ export function SyntheticForm({ rest, onRestChange, headers, onHeadersChange }) 
 
                 <div className="form-row form-group-last">
                   <div className="form-group">
-                    <label htmlFor="statusJsonPath">Status Field Path</label>
+                    <div className="label-row">
+                      <label htmlFor="statusJsonPath">Status Field Path</label>
+                      <span className="label-row-actions">
+                        <button
+                          type="button"
+                          className="pick-id-btn"
+                          onClick={() => setTerminalPickerOpen(true)}
+                          title="Fire start → probe once and pick the terminal key from the response"
+                        >
+                          <WandIcon />
+                          <span>Pick from probe</span>
+                        </button>
+                      </span>
+                    </div>
                     <input
                       id="statusJsonPath"
                       type="text"
@@ -695,6 +710,23 @@ export function SyntheticForm({ rest, onRestChange, headers, onHeadersChange }) 
         value={rest.idJsonPath}
         onChange={(path) => handleRestChange('idJsonPath', path)}
         onClose={() => setIdPickerOpen(false)}
+      />
+
+      <TerminalPathPicker
+        open={terminalPickerOpen}
+        startRequest={{
+          url: rest.startUrl,
+          method: rest.method,
+          body: rest.body,
+          dynamicFields: rest.dynamicFields || [],
+        }}
+        probeUrl={rest.probeUrl}
+        idJsonPath={rest.idJsonPath}
+        headers={headerMap}
+        statusJsonPath={rest.statusJsonPath}
+        expectedStatusValue={rest.expectedStatusValue}
+        onChange={(patch) => onRestChange({ ...rest, ...patch })}
+        onClose={() => setTerminalPickerOpen(false)}
       />
 
       <PreviewModal

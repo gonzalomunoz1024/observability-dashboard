@@ -1,19 +1,23 @@
 package com.dashboard.command.synthetic.adapters.inbound;
 
+import com.dashboard.command.synthetic.domain.HttpProbeResponse;
 import com.dashboard.command.synthetic.domain.SyntheticEvent;
 import com.dashboard.command.synthetic.domain.SyntheticRun;
 import com.dashboard.command.synthetic.domain.SyntheticTransaction;
+import com.jayway.jsonpath.JsonPath;
 import com.dashboard.command.synthetic.domain.command.InjectEventCommand;
 import com.dashboard.command.synthetic.domain.command.RestInjectCommand;
 import com.dashboard.command.synthetic.domain.command.TraceEventCommand;
 import com.dashboard.command.synthetic.dto.inbound.InjectAndTraceRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.InjectRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.ParseSpecRequestDto;
+import com.dashboard.command.synthetic.dto.inbound.ProbeOnceRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.ProbeRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.RestInjectAndCheckRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.SyntheticTransactionDto;
 import com.dashboard.command.synthetic.dto.inbound.TraceRequestDto;
 import com.dashboard.command.synthetic.dto.outbound.InjectResponseDto;
+import com.dashboard.command.synthetic.dto.outbound.ProbeOnceResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.ProbeResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.RestCheckResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.SyntheticRunResponseDto;
@@ -175,6 +179,82 @@ public class RestControllerSyntheticInboundAdapter {
                         .error(e.getMessage())
                         .elapsedTime(System.currentTimeMillis() - start)
                         .build())));
+    }
+
+    @PostMapping("/rest/probe-once")
+    public Mono<ResponseEntity<?>> probeOnce(@RequestBody ProbeOnceRequestDto request) {
+        if (request.getStartUrl() == null || request.getStartUrl().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Start URL is required")));
+        }
+        if (request.getProbeUrl() == null || request.getProbeUrl().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Probe URL is required")));
+        }
+
+        long startTime = System.currentTimeMillis();
+        String startMethod = request.getMethod() == null || request.getMethod().isBlank()
+                ? "POST" : request.getMethod();
+
+        String resolvedStartUrl = templateResolver.render(request.getStartUrl());
+        String resolvedBody = dynamicFieldsResolver.apply(
+                templateResolver.render(request.getBody()), request.getDynamicFields());
+        Map<String, String> resolvedHeaders = renderHeaderMap(request.getHeaders());
+
+        return httpProbePort.execute(resolvedStartUrl, startMethod, resolvedBody, resolvedHeaders)
+                .onErrorResume(e -> Mono.just(HttpProbeResponse.builder()
+                        .statusCode(-1).body("Request failed: " + e.getMessage()).build()))
+                .flatMap(startResp -> {
+                    long startElapsed = System.currentTimeMillis() - startTime;
+                    ProbeResponseDto startDto = ProbeResponseDto.builder()
+                            .statusCode(startResp.getStatusCode())
+                            .body(startResp.getBody())
+                            .elapsedTime(startElapsed)
+                            .build();
+
+                    if (startResp.getStatusCode() < 200 || startResp.getStatusCode() >= 300) {
+                        return Mono.just(ResponseEntity.ok(ProbeOnceResponseDto.builder()
+                                .start(startDto)
+                                .error("Start endpoint returned status " + startResp.getStatusCode())
+                                .build()));
+                    }
+
+                    String probeUrl = templateResolver.render(request.getProbeUrl());
+                    String extractedId = null;
+                    if (probeUrl.contains("{{id}}")) {
+                        if (request.getIdJsonPath() == null || request.getIdJsonPath().isBlank()) {
+                            return Mono.just(ResponseEntity.ok(ProbeOnceResponseDto.builder()
+                                    .start(startDto)
+                                    .error("Probe URL uses {{id}} but no idJsonPath was provided")
+                                    .build()));
+                        }
+                        try {
+                            Object idValue = JsonPath.read(startResp.getBody(), request.getIdJsonPath());
+                            extractedId = String.valueOf(idValue);
+                            probeUrl = probeUrl.replace("{{id}}", extractedId);
+                        } catch (Exception e) {
+                            return Mono.just(ResponseEntity.ok(ProbeOnceResponseDto.builder()
+                                    .start(startDto)
+                                    .error("Failed to extract id with path '" + request.getIdJsonPath() + "': " + e.getMessage())
+                                    .build()));
+                        }
+                    }
+
+                    String resolvedProbeUrl = probeUrl;
+                    String finalExtractedId = extractedId;
+                    long probeStart = System.currentTimeMillis();
+                    return httpProbePort.execute(resolvedProbeUrl, "GET", null, resolvedHeaders)
+                            .onErrorResume(e -> Mono.just(HttpProbeResponse.builder()
+                                    .statusCode(-1).body("Request failed: " + e.getMessage()).build()))
+                            .<ResponseEntity<?>>map(probeResp -> ResponseEntity.ok(ProbeOnceResponseDto.builder()
+                                    .start(startDto)
+                                    .extractedId(finalExtractedId)
+                                    .resolvedProbeUrl(resolvedProbeUrl)
+                                    .probe(ProbeResponseDto.builder()
+                                            .statusCode(probeResp.getStatusCode())
+                                            .body(probeResp.getBody())
+                                            .elapsedTime(System.currentTimeMillis() - probeStart)
+                                            .build())
+                                    .build()));
+                });
     }
 
     @PostMapping("/swagger/parse")

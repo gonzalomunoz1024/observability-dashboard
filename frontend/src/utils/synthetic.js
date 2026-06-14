@@ -149,6 +149,19 @@ export async function getRun(id) {
   return response.json();
 }
 
+export async function probeOnce(payload) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/rest/probe-once`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await safeJson(response);
+    throw new Error(err.error || err.message || 'Failed to probe');
+  }
+  return response.json();
+}
+
 export async function parseSpec({ source, value }) {
   const response = await fetch(`${BACKEND_URL}/api/synthetic/swagger/parse`, {
     method: 'POST',
