@@ -1,0 +1,194 @@
+.shape-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-3);
+}
+
+.shape-panel-empty {
+  background: var(--color-bg-secondary);
+}
+
+.shape-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.shape-eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-fg-quaternary);
+}
+
+.shape-title {
+  margin: 2px 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-fg-primary);
+}
+
+.shape-hint {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-tertiary);
+}
+
+.shape-summary {
+  font-size: var(--font-size-xs);
+  color: var(--color-fg-quaternary);
+}
+
+.shape-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.shape-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: background var(--transition-fast);
+}
+
+.shape-row:last-child {
+  border-bottom: none;
+}
+
+.shape-row-active {
+  background: rgba(0, 122, 255, 0.04);
+}
+
+.shape-row-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.shape-path {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shape-type {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--color-fg-quaternary);
+  padding: 1px var(--space-2);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.shape-required {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-accent);
+  padding: 1px var(--space-2);
+  border: 1px solid rgba(0, 122, 255, 0.3);
+  border-radius: var(--radius-full);
+}
+
+.shape-row-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.shape-generator {
+  padding: 2px var(--space-2);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-primary);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.shape-generator:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.shape-args {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.arg-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.arg-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-fg-quaternary);
+}
+
+.arg-input input {
+  width: 60px;
+  padding: 2px var(--space-2);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-primary);
+  font-size: 12px;
+  font-family: var(--font-family-mono);
+}
+
+.arg-input input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.args-hint {
+  font-size: 11px;
+  color: var(--color-fg-quaternary);
+  font-style: italic;
+}
+
+.shape-suggest {
+  padding: 2px var(--space-2);
+  background: transparent;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-fg-tertiary);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.shape-suggest:hover:not(:disabled) {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}

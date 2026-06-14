@@ -47,11 +47,11 @@ export async function getEventsByCorrelationId(correlationId, index) {
   return response.json();
 }
 
-export async function probeRequest({ url, method, body, headers }) {
+export async function probeRequest({ url, method, body, headers, dynamicFields = [] }) {
   const response = await fetch(`${BACKEND_URL}/api/synthetic/rest/probe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, method, body, headers }),
+    body: JSON.stringify({ url, method, body, headers, dynamicFields }),
   });
 
   if (!response.ok) {
@@ -162,11 +162,11 @@ export async function parseSpec({ source, value }) {
   return response.json();
 }
 
-export async function previewTemplate(text) {
+export async function previewTemplate(text, dynamicFields = []) {
   const response = await fetch(`${BACKEND_URL}/api/synthetic/template/preview`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, dynamicFields }),
   });
   if (!response.ok) {
     const err = await safeJson(response);

@@ -22,6 +22,7 @@ import com.dashboard.command.synthetic.dto.outbound.TraceResponseDto;
 import com.dashboard.command.synthetic.ports.outbound.HttpProbePort;
 import com.dashboard.command.synthetic.ports.outbound.SyntheticRunRepositoryPort;
 import com.dashboard.command.synthetic.ports.outbound.SyntheticTransactionRepositoryPort;
+import com.dashboard.command.synthetic.usecases.DynamicFieldsResolver;
 import com.dashboard.command.synthetic.usecases.InjectEventUseCase;
 import com.dashboard.command.synthetic.usecases.ParseSpecUseCase;
 import com.dashboard.command.synthetic.usecases.RestInjectAndProbeUseCase;
@@ -56,6 +57,7 @@ public class RestControllerSyntheticInboundAdapter {
     private final RunSyntheticTransactionUseCase runUseCase;
     private final ObjectMapper objectMapper;
     private final TemplateResolver templateResolver;
+    private final DynamicFieldsResolver dynamicFieldsResolver;
     private final ParseSpecUseCase parseSpecUseCase;
 
     @PostMapping("/inject")
@@ -158,7 +160,8 @@ public class RestControllerSyntheticInboundAdapter {
                 ? "GET" : request.getMethod();
 
         String resolvedUrl = templateResolver.render(request.getUrl());
-        String resolvedBody = templateResolver.render(request.getBody());
+        String resolvedBody = dynamicFieldsResolver.apply(
+                templateResolver.render(request.getBody()), request.getDynamicFields());
         Map<String, String> resolvedHeaders = renderHeaderMap(request.getHeaders());
 
         return httpProbePort.execute(resolvedUrl, method, resolvedBody, resolvedHeaders)
@@ -183,12 +186,28 @@ public class RestControllerSyntheticInboundAdapter {
     }
 
     @PostMapping("/template/preview")
-    public Mono<ResponseEntity<?>> previewTemplate(@RequestBody Map<String, String> payload) {
-        String input = payload != null ? payload.get("text") : null;
-        if (input == null) {
+    public Mono<ResponseEntity<?>> previewTemplate(@RequestBody JsonNode payload) {
+        JsonNode textNode = payload != null ? payload.get("text") : null;
+        if (textNode == null || textNode.isNull()) {
             return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Missing 'text' field")));
         }
-        return Mono.just(ResponseEntity.ok(Map.of("rendered", templateResolver.render(input))));
+        String text = textNode.asText();
+        String afterTemplates = templateResolver.render(text);
+
+        List<com.dashboard.command.synthetic.domain.DynamicField> dynamicFields = null;
+        JsonNode dfNode = payload.get("dynamicFields");
+        if (dfNode != null && dfNode.isArray()) {
+            try {
+                dynamicFields = objectMapper.convertValue(dfNode,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class,
+                                com.dashboard.command.synthetic.domain.DynamicField.class));
+            } catch (Exception ignored) { /* ignore malformed dynamic fields */ }
+        }
+        String rendered = dynamicFields != null
+                ? dynamicFieldsResolver.apply(afterTemplates, dynamicFields)
+                : afterTemplates;
+
+        return Mono.just(ResponseEntity.ok(Map.of("rendered", rendered)));
     }
 
     private Map<String, String> renderHeaderMap(Map<String, String> headers) {
@@ -231,6 +250,7 @@ public class RestControllerSyntheticInboundAdapter {
                 .expectedStatusValue(request.getExpectedStatusValue())
                 .timeout(request.getTimeout() > 0 ? request.getTimeout() : 30000)
                 .pollInterval(request.getPollInterval() > 0 ? request.getPollInterval() : 1000)
+                .dynamicFields(request.getDynamicFields())
                 .build();
 
         return restInjectAndProbeUseCase.execute(command)

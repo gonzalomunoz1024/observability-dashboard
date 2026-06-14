@@ -29,13 +29,15 @@ public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCa
 
     private final HttpProbePort httpProbePort;
     private final TemplateResolver templateResolver;
+    private final DynamicFieldsResolver dynamicFieldsResolver;
 
     @Override
     public Mono<RestCheckResult> execute(RestInjectCommand command) {
         long startTime = System.currentTimeMillis();
 
         String resolvedStartUrl = templateResolver.render(command.getStartUrl());
-        String resolvedBody = templateResolver.render(command.getBody());
+        String resolvedBody = dynamicFieldsResolver.apply(
+                templateResolver.render(command.getBody()), command.getDynamicFields());
         Map<String, String> resolvedHeaders = renderHeaders(command.getHeaders());
 
         return httpProbePort.execute(resolvedStartUrl, command.getMethod(),

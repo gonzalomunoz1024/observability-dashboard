@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { IdPathPicker } from './IdPathPicker';
 import { JsonEditor } from './JsonEditor';
+import { RequestShapePanel } from './RequestShapePanel';
 import { previewTemplate } from '../../utils/synthetic';
 import './SyntheticForm.css';
 
@@ -23,6 +24,7 @@ export const DEFAULT_REST_CONFIG = {
   expectedStatusValue: '',
   timeout: 30000,
   pollInterval: 1000,
+  requestFields: [],
   dynamicFields: [],
 };
 
@@ -286,7 +288,7 @@ function FieldExpandDrawer({ field, onChange, onClose }) {
   );
 }
 
-function PreviewModal({ open, label, value, onClose }) {
+function PreviewModal({ open, label, value, dynamicFields, onClose }) {
   const [rendered, setRendered] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -297,12 +299,12 @@ function PreviewModal({ open, label, value, onClose }) {
     setLoading(true);
     setError(null);
     setRendered('');
-    previewTemplate(value || '')
+    previewTemplate(value || '', dynamicFields || [])
       .then((r) => { if (!cancelled) setRendered(r.rendered ?? ''); })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [open, value]);
+  }, [open, value, dynamicFields]);
 
   useEffect(() => {
     if (!open) return;
@@ -493,6 +495,7 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                 onPreview={() => setPreviewTarget({
                   label: 'Payload (resolved)',
                   value: kafka.payload,
+                  dynamicFields: [],
                 })}
               />
               <JsonEditor
@@ -557,6 +560,7 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                     onPreview={() => setPreviewTarget({
                       label: 'Request Body (resolved)',
                       value: rest.body,
+                      dynamicFields: rest.dynamicFields || [],
                     })}
                   />
                   <JsonEditor
@@ -564,6 +568,11 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                     onChange={(v) => handleRestChange('body', v)}
                     invalid={bodyValidity === 'invalid'}
                     height={200}
+                  />
+                  <RequestShapePanel
+                    fields={rest.requestFields || []}
+                    dynamicFields={rest.dynamicFields || []}
+                    onChange={(next) => handleRestChange('dynamicFields', next)}
                   />
                 </div>
               </div>
@@ -735,7 +744,12 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
 
       <IdPathPicker
         open={idPickerOpen}
-        request={{ url: rest.startUrl, method: rest.method, body: rest.body }}
+        request={{
+          url: rest.startUrl,
+          method: rest.method,
+          body: rest.body,
+          dynamicFields: rest.dynamicFields || [],
+        }}
         headers={headerMap}
         value={rest.idJsonPath}
         onChange={(path) => handleRestChange('idJsonPath', path)}
@@ -746,6 +760,7 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
         open={previewTarget != null}
         label={previewTarget?.label}
         value={previewTarget?.value}
+        dynamicFields={previewTarget?.dynamicFields}
         onClose={() => setPreviewTarget(null)}
       />
     </>

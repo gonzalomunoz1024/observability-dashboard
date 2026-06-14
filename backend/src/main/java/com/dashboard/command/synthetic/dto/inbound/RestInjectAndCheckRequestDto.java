@@ -1,10 +1,12 @@
 package com.dashboard.command.synthetic.dto.inbound;
 
+import com.dashboard.command.synthetic.domain.DynamicField;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.jackson.Jacksonized;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -25,4 +27,5 @@ public class RestInjectAndCheckRequestDto {
     private long timeout = 30000;
     @Builder.Default
     private long pollInterval = 1000;
+    private List<DynamicField> dynamicFields;
 }

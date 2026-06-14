@@ -1,8 +1,10 @@
 package com.dashboard.command.synthetic.domain.command;
 
+import com.dashboard.command.synthetic.domain.DynamicField;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -21,4 +23,5 @@ public class RestInjectCommand {
     private long timeout = 30000;
     @Builder.Default
     private long pollInterval = 1000;
+    private List<DynamicField> dynamicFields;
 }

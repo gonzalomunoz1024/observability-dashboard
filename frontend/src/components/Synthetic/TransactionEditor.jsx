@@ -31,6 +31,8 @@ function applyStartOperation(restPrev, op, spec) {
     method: op.method,
     startUrl,
     body,
+    requestFields: op.requestFields || [],
+    dynamicFields: [],
   };
 }
 
@@ -115,6 +117,8 @@ function loadInitialState(editing) {
         expectedStatusValue: config.expectedStatusValue || '',
         timeout: config.timeout || 30000,
         pollInterval: config.pollInterval || 1000,
+        requestFields: Array.isArray(config.requestFields) ? config.requestFields : [],
+        dynamicFields: Array.isArray(config.dynamicFields) ? config.dynamicFields : [],
       }
     : { ...DEFAULT_REST_CONFIG };
 
@@ -159,6 +163,8 @@ function buildConfigPayload(mode, rest, kafka, headers) {
       expectedStatusValue: rest.expectedStatusValue.trim(),
       timeout: rest.timeout,
       pollInterval: rest.pollInterval,
+      requestFields: rest.requestFields || [],
+      dynamicFields: rest.dynamicFields || [],
     };
   }
   let payload = {};

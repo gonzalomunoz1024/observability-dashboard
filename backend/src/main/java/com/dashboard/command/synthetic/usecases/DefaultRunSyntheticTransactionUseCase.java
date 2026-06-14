@@ -1,5 +1,6 @@
 package com.dashboard.command.synthetic.usecases;
 
+import com.dashboard.command.synthetic.domain.DynamicField;
 import com.dashboard.command.synthetic.domain.SyntheticRun;
 import com.dashboard.command.synthetic.domain.SyntheticTransaction;
 import com.dashboard.command.synthetic.domain.command.InjectEventCommand;
@@ -16,6 +17,7 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -67,6 +69,15 @@ public class DefaultRunSyntheticTransactionUseCase implements RunSyntheticTransa
                     "Invalid config JSON: " + e.getMessage(), System.currentTimeMillis() - start);
         }
 
+        List<DynamicField> dynamicFields = null;
+        JsonNode dfNode = config.get("dynamicFields");
+        if (dfNode != null && dfNode.isArray()) {
+            try {
+                dynamicFields = objectMapper.convertValue(dfNode,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, DynamicField.class));
+            } catch (Exception ignored) { /* leave null on bad shape */ }
+        }
+
         RestInjectCommand command = RestInjectCommand.builder()
                 .startUrl(textOr(config, "startUrl", ""))
                 .method(textOr(config, "method", "POST"))
@@ -78,6 +89,7 @@ public class DefaultRunSyntheticTransactionUseCase implements RunSyntheticTransa
                 .expectedStatusValue(textOr(config, "expectedStatusValue", ""))
                 .timeout(longOr(config, "timeout", 30000))
                 .pollInterval(longOr(config, "pollInterval", 1000))
+                .dynamicFields(dynamicFields)
                 .build();
 
         return restInjectAndProbeUseCase.execute(command)

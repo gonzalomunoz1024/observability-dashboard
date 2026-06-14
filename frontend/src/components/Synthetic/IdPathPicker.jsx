@@ -278,6 +278,7 @@ export function IdPathPicker({ open, request, value, onChange, onClose, headers 
         method: request.method,
         body: request.body,
         headers: headers,
+        dynamicFields: request.dynamicFields || [],
       });
       setResponse(result);
       if (result.error) setError(result.error);
