@@ -21,3 +21,23 @@
 .json-editor-wrap .monaco-editor .margin {
   background-color: transparent !important;
 }
+
+/* Inline highlight on a value that's marked dynamic — wavy underline + tinted
+   background so it's obvious at a glance that this isn't what gets sent. */
+.json-editor-wrap .monaco-editor .json-editor-dynamic {
+  background: rgba(0, 122, 255, 0.12) !important;
+  border-radius: 3px;
+  text-decoration: underline wavy var(--color-accent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* Inline label that follows the dynamic value, e.g. "↳ UUID". */
+.json-editor-wrap .monaco-editor .json-editor-dynamic-suffix {
+  color: var(--color-accent) !important;
+  font-style: italic;
+  font-size: 0.85em;
+  opacity: 0.85;
+  margin-left: 4px;
+  letter-spacing: 0.02em;
+}

@@ -239,7 +239,7 @@ function DynamicFieldChips({ fields, onRemove }) {
   );
 }
 
-function FieldExpandDrawer({ field, onChange, onClose }) {
+function FieldExpandDrawer({ field, dynamicFields, onChange, onClose }) {
   useEffect(() => {
     if (!field) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -287,6 +287,7 @@ function FieldExpandDrawer({ field, onChange, onClose }) {
               onChange={(v) => onChange(v)}
               invalid={validity === 'invalid'}
               height="100%"
+              dynamicFields={field.attachDynamicFields ? dynamicFields : undefined}
             />
           ) : field.multiline ? (
             <textarea
@@ -488,6 +489,7 @@ export function SyntheticForm({ rest, onRestChange, headers, onHeadersChange }) 
                     onExpand={expandRest('body', 'Request Body (JSON)', {
                       eyebrow: 'Start Request',
                       isJson: true,
+                      attachDynamicFields: true,
                     })}
                     onPreview={() => setPreviewTarget({
                       label: 'Request Body (resolved)',
@@ -501,6 +503,7 @@ export function SyntheticForm({ rest, onRestChange, headers, onHeadersChange }) 
                     onChange={(v) => handleRestChange('body', v)}
                     invalid={bodyValidity === 'invalid'}
                     height={200}
+                    dynamicFields={dynamicFields}
                   />
                   <DynamicFieldChips
                     fields={dynamicFields}
@@ -668,6 +671,7 @@ export function SyntheticForm({ rest, onRestChange, headers, onHeadersChange }) 
 
       <FieldExpandDrawer
         field={drawerField}
+        dynamicFields={dynamicFields}
         onChange={handleExpandedChange}
         onClose={() => setExpandedField(null)}
       />
