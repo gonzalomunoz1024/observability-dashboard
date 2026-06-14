@@ -30,6 +30,9 @@ public class R2dbcSyntheticTransactionAdapter implements SyntheticTransactionRep
         Instant nextRunAt = tx.isEnabled() && tx.getIntervalSeconds() != null ? now : null;
         tx.setNextRunAt(nextRunAt);
 
+        // R2DBC pools connections, so SELECT IDENTITY() in a follow-up call can
+        // land on a different connection and return nothing — use the driver's
+        // returnGeneratedValues hook instead.
         return databaseClient.sql("""
                 INSERT INTO synthetic_transactions
                 (name, mode, config, interval_seconds, enabled, next_run_at,
@@ -45,11 +48,9 @@ public class R2dbcSyntheticTransactionAdapter implements SyntheticTransactionRep
                 .bind("nextRunAt", nextRunAt != null ? LocalDateTime.ofInstant(nextRunAt, ZoneOffset.UTC) : LocalDateTime.MIN)
                 .bind("createdAt", LocalDateTime.ofInstant(now, ZoneOffset.UTC))
                 .bind("updatedAt", LocalDateTime.ofInstant(now, ZoneOffset.UTC))
-                .fetch()
-                .rowsUpdated()
-                .flatMap(rows -> databaseClient.sql("SELECT IDENTITY() AS id")
-                        .map((row, md) -> row.get("id", Long.class))
-                        .one())
+                .filter(statement -> statement.returnGeneratedValues("id"))
+                .map(row -> row.get(0, Long.class))
+                .one()
                 .map(id -> { tx.setId(id); return tx; });
     }
 

@@ -40,11 +40,9 @@ public class R2dbcSyntheticRunAdapter implements SyntheticRunRepositoryPort {
                 .bind("elapsedMs", run.getElapsedMs() != null ? run.getElapsedMs() : 0L)
                 .bind("result", run.getResult() != null ? run.getResult() : "")
                 .bind("error", run.getError() != null ? run.getError() : "")
-                .fetch()
-                .rowsUpdated()
-                .flatMap(rows -> databaseClient.sql("SELECT IDENTITY() AS id")
-                        .map((row, md) -> row.get("id", Long.class))
-                        .one())
+                .filter(statement -> statement.returnGeneratedValues("id"))
+                .map(row -> row.get(0, Long.class))
+                .one()
                 .map(id -> { run.setId(id); return run; });
     }
 
