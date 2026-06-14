@@ -81,6 +81,78 @@ export async function restInjectAndCheck(config) {
   return response.json();
 }
 
+export async function listTransactions() {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/transactions`);
+  if (!response.ok) throw new Error('Failed to load transactions');
+  return response.json();
+}
+
+export async function createTransaction(payload) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/transactions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await safeJson(response);
+    throw new Error(err.error || err.message || 'Failed to create transaction');
+  }
+  return response.json();
+}
+
+export async function updateTransaction(id, payload) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/transactions/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const err = await safeJson(response);
+    throw new Error(err.error || err.message || 'Failed to update transaction');
+  }
+  return response.json();
+}
+
+export async function deleteTransaction(id) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/transactions/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const err = await safeJson(response);
+    throw new Error(err.error || err.message || 'Failed to delete transaction');
+  }
+}
+
+export async function runTransaction(id) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/transactions/${id}/run`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const err = await safeJson(response);
+    throw new Error(err.error || err.message || 'Failed to run transaction');
+  }
+  return response.json();
+}
+
+export async function listRuns({ transactionId, limit = 50 } = {}) {
+  const params = new URLSearchParams();
+  if (transactionId != null) params.set('transactionId', transactionId);
+  params.set('limit', String(limit));
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/runs?${params.toString()}`);
+  if (!response.ok) throw new Error('Failed to load runs');
+  return response.json();
+}
+
+export async function getRun(id) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/runs/${id}`);
+  if (!response.ok) throw new Error('Failed to load run');
+  return response.json();
+}
+
+async function safeJson(response) {
+  try { return await response.json(); } catch { return {}; }
+}
+
 export async function injectAndTrace(topic, eventType, expectedFlow, options = {}) {
   const { payload, index, timeout } = options;
 

@@ -1,6 +1,8 @@
 package com.dashboard.command.synthetic.adapters.inbound;
 
 import com.dashboard.command.synthetic.domain.SyntheticEvent;
+import com.dashboard.command.synthetic.domain.SyntheticRun;
+import com.dashboard.command.synthetic.domain.SyntheticTransaction;
 import com.dashboard.command.synthetic.domain.command.InjectEventCommand;
 import com.dashboard.command.synthetic.domain.command.RestInjectCommand;
 import com.dashboard.command.synthetic.domain.command.TraceEventCommand;
@@ -8,21 +10,32 @@ import com.dashboard.command.synthetic.dto.inbound.InjectAndTraceRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.InjectRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.ProbeRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.RestInjectAndCheckRequestDto;
+import com.dashboard.command.synthetic.dto.inbound.SyntheticTransactionDto;
 import com.dashboard.command.synthetic.dto.inbound.TraceRequestDto;
 import com.dashboard.command.synthetic.dto.outbound.InjectResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.ProbeResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.RestCheckResponseDto;
+import com.dashboard.command.synthetic.dto.outbound.SyntheticRunResponseDto;
+import com.dashboard.command.synthetic.dto.outbound.SyntheticTransactionResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.TraceResponseDto;
 import com.dashboard.command.synthetic.ports.outbound.HttpProbePort;
+import com.dashboard.command.synthetic.ports.outbound.SyntheticRunRepositoryPort;
+import com.dashboard.command.synthetic.ports.outbound.SyntheticTransactionRepositoryPort;
 import com.dashboard.command.synthetic.usecases.InjectEventUseCase;
 import com.dashboard.command.synthetic.usecases.RestInjectAndProbeUseCase;
+import com.dashboard.command.synthetic.usecases.RunSyntheticTransactionUseCase;
 import com.dashboard.command.synthetic.usecases.TraceEventUseCase;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -35,6 +48,10 @@ public class RestControllerSyntheticInboundAdapter {
     private final TraceEventUseCase traceEventUseCase;
     private final RestInjectAndProbeUseCase restInjectAndProbeUseCase;
     private final HttpProbePort httpProbePort;
+    private final SyntheticTransactionRepositoryPort transactionRepository;
+    private final SyntheticRunRepositoryPort runRepository;
+    private final RunSyntheticTransactionUseCase runUseCase;
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/inject")
     public Mono<ResponseEntity<?>> inject(@RequestBody InjectRequestDto request) {
@@ -220,5 +237,151 @@ public class RestControllerSyntheticInboundAdapter {
         map.put("source", event.getSource());
         map.put("payload", event.getPayload());
         return map;
+    }
+
+    // ----- Synthetic Transactions CRUD -----
+
+    @GetMapping("/transactions")
+    public Flux<SyntheticTransactionResponseDto> listTransactions() {
+        return transactionRepository.findAll().map(this::toTxResponse);
+    }
+
+    @PostMapping("/transactions")
+    public Mono<ResponseEntity<?>> createTransaction(@RequestBody SyntheticTransactionDto request) {
+        String validationError = validateTxDto(request);
+        if (validationError != null) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", validationError)));
+        }
+        SyntheticTransaction tx = SyntheticTransaction.builder()
+                .name(request.getName().trim())
+                .mode(request.getMode().toLowerCase())
+                .config(request.getConfig().toString())
+                .intervalSeconds(request.getIntervalSeconds())
+                .enabled(request.getEnabled() == null || request.getEnabled())
+                .build();
+        return transactionRepository.save(tx)
+                .<ResponseEntity<?>>map(saved -> ResponseEntity.ok(toTxResponse(saved)));
+    }
+
+    @PutMapping("/transactions/{id}")
+    public Mono<ResponseEntity<?>> updateTransaction(@PathVariable Long id,
+                                                      @RequestBody SyntheticTransactionDto request) {
+        String validationError = validateTxDto(request);
+        if (validationError != null) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", validationError)));
+        }
+        return transactionRepository.findById(id)
+                .<ResponseEntity<?>>flatMap(existing -> {
+                    existing.setName(request.getName().trim());
+                    existing.setMode(request.getMode().toLowerCase());
+                    existing.setConfig(request.getConfig().toString());
+                    existing.setIntervalSeconds(request.getIntervalSeconds());
+                    existing.setEnabled(request.getEnabled() == null || request.getEnabled());
+                    return transactionRepository.update(existing)
+                            .map(saved -> ResponseEntity.ok(toTxResponse(saved)));
+                })
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/transactions/{id}")
+    public Mono<ResponseEntity<Void>> deleteTransaction(@PathVariable Long id) {
+        return transactionRepository.deleteById(id)
+                .thenReturn(ResponseEntity.noContent().<Void>build());
+    }
+
+    @PostMapping("/transactions/{id}/run")
+    public Mono<ResponseEntity<?>> runTransaction(@PathVariable Long id) {
+        return transactionRepository.findById(id)
+                .<ResponseEntity<?>>flatMap(tx -> runUseCase.run(tx, "manual")
+                        .flatMap(run -> {
+                            Instant nextRunAt = tx.isEnabled() && tx.getIntervalSeconds() != null
+                                    ? Instant.now().plusSeconds(tx.getIntervalSeconds())
+                                    : tx.getNextRunAt();
+                            return transactionRepository.updateRunTracking(tx.getId(),
+                                            run.getStartedAt(), nextRunAt, run.getStatus())
+                                    .thenReturn(ResponseEntity.ok(toRunResponse(run, tx)));
+                        }))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/runs")
+    public Flux<SyntheticRunResponseDto> listRuns(@RequestParam(required = false) Long transactionId,
+                                                   @RequestParam(defaultValue = "50") int limit) {
+        Flux<SyntheticRun> runs = transactionId != null
+                ? runRepository.findByTransaction(transactionId, limit)
+                : runRepository.findRecent(limit);
+
+        return runs.collectList().flatMapMany(list -> {
+            if (list.isEmpty()) return Flux.empty();
+            List<Long> txIds = list.stream().map(SyntheticRun::getTransactionId)
+                    .distinct().collect(Collectors.toList());
+            return Flux.fromIterable(txIds)
+                    .flatMap(transactionRepository::findById)
+                    .collectMap(SyntheticTransaction::getId)
+                    .flatMapMany(txMap -> Flux.fromIterable(list)
+                            .map(run -> toRunResponse(run, txMap.get(run.getTransactionId()))));
+        });
+    }
+
+    @GetMapping("/runs/{id}")
+    public Mono<ResponseEntity<?>> getRun(@PathVariable Long id) {
+        return runRepository.findById(id)
+                .<ResponseEntity<?>>flatMap(run -> transactionRepository.findById(run.getTransactionId())
+                        .map(tx -> ResponseEntity.ok(toRunResponse(run, tx)))
+                        .defaultIfEmpty(ResponseEntity.ok(toRunResponse(run, null))))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    private String validateTxDto(SyntheticTransactionDto dto) {
+        if (dto.getName() == null || dto.getName().isBlank()) return "Name is required";
+        if (dto.getMode() == null || dto.getMode().isBlank()) return "Mode is required";
+        if (!"rest".equalsIgnoreCase(dto.getMode()) && !"kafka".equalsIgnoreCase(dto.getMode())) {
+            return "Mode must be 'rest' or 'kafka'";
+        }
+        if (dto.getConfig() == null || dto.getConfig().isNull()) return "Config is required";
+        if (dto.getIntervalSeconds() != null && dto.getIntervalSeconds() < 5) {
+            return "Interval must be at least 5 seconds";
+        }
+        return null;
+    }
+
+    private SyntheticTransactionResponseDto toTxResponse(SyntheticTransaction tx) {
+        JsonNode config = null;
+        try {
+            config = tx.getConfig() != null ? objectMapper.readTree(tx.getConfig()) : null;
+        } catch (Exception ignored) { /* leave null */ }
+        return SyntheticTransactionResponseDto.builder()
+                .id(tx.getId())
+                .name(tx.getName())
+                .mode(tx.getMode())
+                .config(config)
+                .intervalSeconds(tx.getIntervalSeconds())
+                .enabled(tx.isEnabled())
+                .nextRunAt(tx.getNextRunAt())
+                .lastRunAt(tx.getLastRunAt())
+                .lastStatus(tx.getLastStatus())
+                .createdAt(tx.getCreatedAt())
+                .updatedAt(tx.getUpdatedAt())
+                .build();
+    }
+
+    private SyntheticRunResponseDto toRunResponse(SyntheticRun run, SyntheticTransaction tx) {
+        JsonNode result = null;
+        try {
+            result = run.getResult() != null ? objectMapper.readTree(run.getResult()) : null;
+        } catch (Exception ignored) { /* leave null */ }
+        return SyntheticRunResponseDto.builder()
+                .id(run.getId())
+                .transactionId(run.getTransactionId())
+                .transactionName(tx != null ? tx.getName() : null)
+                .mode(tx != null ? tx.getMode() : null)
+                .status(run.getStatus())
+                .triggerType(run.getTriggerType())
+                .startedAt(run.getStartedAt())
+                .finishedAt(run.getFinishedAt())
+                .elapsedMs(run.getElapsedMs())
+                .result(result)
+                .error(run.getError())
+                .build();
     }
 }
