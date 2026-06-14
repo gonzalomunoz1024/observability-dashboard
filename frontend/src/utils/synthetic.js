@@ -149,6 +149,19 @@ export async function getRun(id) {
   return response.json();
 }
 
+export async function parseSpec({ source, value }) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/swagger/parse`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source, value }),
+  });
+  if (!response.ok) {
+    const err = await safeJson(response);
+    throw new Error(err.error || err.message || 'Failed to parse spec');
+  }
+  return response.json();
+}
+
 export async function previewTemplate(text) {
   const response = await fetch(`${BACKEND_URL}/api/synthetic/template/preview`, {
     method: 'POST',

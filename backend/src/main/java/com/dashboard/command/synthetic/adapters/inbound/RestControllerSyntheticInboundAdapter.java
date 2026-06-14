@@ -8,6 +8,7 @@ import com.dashboard.command.synthetic.domain.command.RestInjectCommand;
 import com.dashboard.command.synthetic.domain.command.TraceEventCommand;
 import com.dashboard.command.synthetic.dto.inbound.InjectAndTraceRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.InjectRequestDto;
+import com.dashboard.command.synthetic.dto.inbound.ParseSpecRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.ProbeRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.RestInjectAndCheckRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.SyntheticTransactionDto;
@@ -22,6 +23,7 @@ import com.dashboard.command.synthetic.ports.outbound.HttpProbePort;
 import com.dashboard.command.synthetic.ports.outbound.SyntheticRunRepositoryPort;
 import com.dashboard.command.synthetic.ports.outbound.SyntheticTransactionRepositoryPort;
 import com.dashboard.command.synthetic.usecases.InjectEventUseCase;
+import com.dashboard.command.synthetic.usecases.ParseSpecUseCase;
 import com.dashboard.command.synthetic.usecases.RestInjectAndProbeUseCase;
 import com.dashboard.command.synthetic.usecases.RunSyntheticTransactionUseCase;
 import com.dashboard.command.synthetic.usecases.TemplateResolver;
@@ -54,6 +56,7 @@ public class RestControllerSyntheticInboundAdapter {
     private final RunSyntheticTransactionUseCase runUseCase;
     private final ObjectMapper objectMapper;
     private final TemplateResolver templateResolver;
+    private final ParseSpecUseCase parseSpecUseCase;
 
     @PostMapping("/inject")
     public Mono<ResponseEntity<?>> inject(@RequestBody InjectRequestDto request) {
@@ -169,6 +172,14 @@ public class RestControllerSyntheticInboundAdapter {
                         .error(e.getMessage())
                         .elapsedTime(System.currentTimeMillis() - start)
                         .build())));
+    }
+
+    @PostMapping("/swagger/parse")
+    public Mono<ResponseEntity<?>> parseSwagger(@RequestBody ParseSpecRequestDto request) {
+        return parseSpecUseCase.parse(request.getSource(), request.getValue())
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .onErrorResume(e -> Mono.just(ResponseEntity.badRequest()
+                        .body(Map.of("error", e.getMessage()))));
     }
 
     @PostMapping("/template/preview")

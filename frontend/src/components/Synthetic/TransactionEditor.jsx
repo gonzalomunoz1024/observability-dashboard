@@ -5,8 +5,67 @@ import {
   DEFAULT_REST_CONFIG,
   jsonValidity,
 } from './SyntheticForm';
+import { SwaggerSpecPanel } from './SwaggerSpecPanel';
 import { createTransaction, updateTransaction } from '../../utils/synthetic';
 import './TransactionEditor.css';
+
+function pickServerBase(spec) {
+  const url = spec?.servers?.[0];
+  if (!url) return '';
+  return url.replace(/\/+$/, '');
+}
+
+function buildPathUrl(base, path) {
+  if (!path) return base;
+  return base + (path.startsWith('/') ? path : `/${path}`);
+}
+
+function applyStartOperation(restPrev, op, spec) {
+  const base = pickServerBase(spec);
+  const startUrl = buildPathUrl(base, op.path);
+  const body = op.requestExample
+    ? JSON.stringify(op.requestExample, null, 2)
+    : restPrev.body || '{}';
+  return {
+    ...restPrev,
+    method: op.method,
+    startUrl,
+    body,
+  };
+}
+
+function applyProbeOperation(restPrev, op, spec) {
+  const base = pickServerBase(spec);
+  let path = op.path;
+  const firstParam = op.pathParams?.[0];
+  if (firstParam) {
+    path = path.replace(`{${firstParam}}`, '{{id}}');
+  }
+  const probeUrl = buildPathUrl(base, path);
+
+  // Try to suggest a status path and terminal value from a 200 response.
+  let statusJsonPath = restPrev.statusJsonPath;
+  let expectedStatusValue = restPrev.expectedStatusValue;
+  const okResponse = op.responses?.['200'] || op.responses?.['default'];
+  if (okResponse?.fields) {
+    const statusField = okResponse.fields.find((f) => /^status$|\.status$/i.test(f.path));
+    if (statusField) {
+      statusJsonPath = `$.${statusField.path}`;
+      if (statusField.enumValues && statusField.enumValues.length && !expectedStatusValue) {
+        expectedStatusValue = statusField.enumValues[statusField.enumValues.length - 1];
+      }
+    }
+  }
+
+  // Suggest an idJsonPath when the path param name matches a top-level field
+  // in the START response. We don't have the start op here — leave as-is and let the user pick.
+  return {
+    ...restPrev,
+    probeUrl,
+    statusJsonPath,
+    expectedStatusValue,
+  };
+}
 
 function CloseIcon() {
   return (
@@ -141,11 +200,17 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
   const [state, setState] = useState(() => loadInitialState(editing));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [startOpKey, setStartOpKey] = useState(null);
+  const [probeOpKey, setProbeOpKey] = useState(null);
+  const [startOpResponses, setStartOpResponses] = useState(null);
 
   useEffect(() => {
     if (open) {
       setState(loadInitialState(editing));
       setError(null);
+      setStartOpKey(null);
+      setProbeOpKey(null);
+      setStartOpResponses(null);
     }
   }, [open, editing]);
 
@@ -249,6 +314,28 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
         </div>
 
         <div className="tx-editor-body">
+          {state.mode === 'rest' && (
+            <SwaggerSpecPanel
+              startOpKey={startOpKey}
+              probeOpKey={probeOpKey}
+              onPickStart={(op, spec) => {
+                setStartOpKey(`${op.method} ${op.path}`);
+                setStartOpResponses(op.responses || null);
+                update({ rest: applyStartOperation(state.rest, op, spec) });
+              }}
+              onPickProbe={(op, spec) => {
+                setProbeOpKey(`${op.method} ${op.path}`);
+                let nextRest = applyProbeOperation(state.rest, op, spec);
+                if (startOpResponses && op.pathParams?.[0]) {
+                  const okResp = startOpResponses['200'] || startOpResponses['201'] || startOpResponses['default'];
+                  const param = op.pathParams[0];
+                  const match = okResp?.fields?.find((f) => f.path === param || f.path.endsWith(`.${param}`));
+                  if (match) nextRest = { ...nextRest, idJsonPath: `$.${match.path}` };
+                }
+                update({ rest: nextRest });
+              }}
+            />
+          )}
           <SyntheticForm
             mode={state.mode}
             onModeChange={(mode) => update({ mode })}

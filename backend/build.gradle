@@ -54,6 +54,9 @@ dependencies {
     // YAML parsing (for artifact verification)
     implementation 'org.yaml:snakeyaml:2.2'
 
+    // OpenAPI / Swagger parsing
+    implementation 'io.swagger.parser.v3:swagger-parser:2.1.22'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
