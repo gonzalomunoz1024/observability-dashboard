@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { injectAndTrace, restInjectAndCheck } from '../../utils/synthetic';
+import { IdPathPicker } from './IdPathPicker';
 import './SyntheticForm.css';
 
 const defaultKafkaData = {
@@ -83,6 +84,20 @@ function CloseIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function WandIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M11 2l1 2 2 1-2 1-1 2-1-2-2-1 2-1 1-2zM3.5 12.5l6-6 2 2-6 6-2-2z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -239,6 +254,7 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
   const [error, setError] = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expandedField, setExpandedField] = useState(null);
+  const [idPickerOpen, setIdPickerOpen] = useState(false);
 
   const bodyValidity = jsonValidity(restData.body);
   const payloadValidity = jsonValidity(formData.payload);
@@ -608,7 +624,20 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
               </div>
 
               <div className="form-group">
-                <label htmlFor="idJsonPath">ID Extraction Path</label>
+                <div className="label-row">
+                  <label htmlFor="idJsonPath">ID Extraction Path</label>
+                  <span className="label-row-actions">
+                    <button
+                      type="button"
+                      className="pick-id-btn"
+                      onClick={() => setIdPickerOpen(true)}
+                      title="Send start request and pick an ID from the response"
+                    >
+                      <WandIcon />
+                      <span>Pick from response</span>
+                    </button>
+                  </span>
+                </div>
                 <input
                   id="idJsonPath"
                   type="text"
@@ -748,6 +777,22 @@ export function SyntheticForm({ onResult, onRunStateChange }) {
         field={drawerField}
         onChange={handleExpandedChange}
         onClose={() => setExpandedField(null)}
+      />
+
+      <IdPathPicker
+        open={idPickerOpen}
+        request={{
+          url: restData.startUrl,
+          method: restData.method,
+          body: restData.body,
+        }}
+        headers={headers.reduce((acc, h) => {
+          if (h.key.trim()) acc[h.key.trim()] = h.value;
+          return acc;
+        }, {})}
+        value={restData.idJsonPath}
+        onChange={(path) => handleRestChange('idJsonPath', path)}
+        onClose={() => setIdPickerOpen(false)}
       />
     </>
   );

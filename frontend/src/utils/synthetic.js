@@ -47,6 +47,25 @@ export async function getEventsByCorrelationId(correlationId, index) {
   return response.json();
 }
 
+export async function probeRequest({ url, method, body, headers }) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/rest/probe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, method, body, headers }),
+  });
+
+  if (!response.ok) {
+    let message = 'Failed to probe request';
+    try {
+      const error = await response.json();
+      message = error.error || error.message || message;
+    } catch { /* keep default */ }
+    throw new Error(message);
+  }
+
+  return response.json();
+}
+
 export async function restInjectAndCheck(config) {
   const response = await fetch(`${BACKEND_URL}/api/synthetic/rest/inject-and-check`, {
     method: 'POST',

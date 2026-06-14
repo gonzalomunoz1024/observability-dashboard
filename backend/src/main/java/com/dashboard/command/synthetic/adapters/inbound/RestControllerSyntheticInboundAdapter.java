@@ -6,11 +6,14 @@ import com.dashboard.command.synthetic.domain.command.RestInjectCommand;
 import com.dashboard.command.synthetic.domain.command.TraceEventCommand;
 import com.dashboard.command.synthetic.dto.inbound.InjectAndTraceRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.InjectRequestDto;
+import com.dashboard.command.synthetic.dto.inbound.ProbeRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.RestInjectAndCheckRequestDto;
 import com.dashboard.command.synthetic.dto.inbound.TraceRequestDto;
 import com.dashboard.command.synthetic.dto.outbound.InjectResponseDto;
+import com.dashboard.command.synthetic.dto.outbound.ProbeResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.RestCheckResponseDto;
 import com.dashboard.command.synthetic.dto.outbound.TraceResponseDto;
+import com.dashboard.command.synthetic.ports.outbound.HttpProbePort;
 import com.dashboard.command.synthetic.usecases.InjectEventUseCase;
 import com.dashboard.command.synthetic.usecases.RestInjectAndProbeUseCase;
 import com.dashboard.command.synthetic.usecases.TraceEventUseCase;
@@ -31,6 +34,7 @@ public class RestControllerSyntheticInboundAdapter {
     private final InjectEventUseCase injectEventUseCase;
     private final TraceEventUseCase traceEventUseCase;
     private final RestInjectAndProbeUseCase restInjectAndProbeUseCase;
+    private final HttpProbePort httpProbePort;
 
     @PostMapping("/inject")
     public Mono<ResponseEntity<?>> inject(@RequestBody InjectRequestDto request) {
@@ -119,6 +123,29 @@ public class RestControllerSyntheticInboundAdapter {
                                 return ResponseEntity.ok(response);
                             });
                 });
+    }
+
+    @PostMapping("/rest/probe")
+    public Mono<ResponseEntity<?>> probe(@RequestBody ProbeRequestDto request) {
+        if (request.getUrl() == null || request.getUrl().isBlank()) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "URL is required")));
+        }
+
+        long start = System.currentTimeMillis();
+        String method = request.getMethod() == null || request.getMethod().isBlank()
+                ? "GET" : request.getMethod();
+
+        return httpProbePort.execute(request.getUrl(), method, request.getBody(), request.getHeaders())
+                .<ResponseEntity<?>>map(response -> ResponseEntity.ok(ProbeResponseDto.builder()
+                        .statusCode(response.getStatusCode())
+                        .body(response.getBody())
+                        .elapsedTime(System.currentTimeMillis() - start)
+                        .build()))
+                .onErrorResume(e -> Mono.just(ResponseEntity.ok(ProbeResponseDto.builder()
+                        .statusCode(-1)
+                        .error(e.getMessage())
+                        .elapsedTime(System.currentTimeMillis() - start)
+                        .build())));
     }
 
     @PostMapping("/rest/inject-and-check")
