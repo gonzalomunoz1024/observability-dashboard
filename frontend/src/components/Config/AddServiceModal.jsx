@@ -9,11 +9,6 @@ export function AddServiceModal({ onClose, onServiceAdded }) {
 
   const [restForm, setRestForm] = useState({
     name: '',
-    url: '',
-    method: 'GET',
-    expectedStatus: 200,
-    interval: 30000,
-    timeout: 5000,
   });
 
   const [cliForm, setCliForm] = useState({
@@ -25,15 +20,6 @@ export function AddServiceModal({ onClose, onServiceAdded }) {
   const validateRestForm = () => {
     const newErrors = {};
     if (!restForm.name.trim()) newErrors.name = 'Name is required';
-    if (!restForm.url.trim()) {
-      newErrors.url = 'URL is required';
-    } else {
-      try {
-        new URL(restForm.url);
-      } catch {
-        newErrors.url = 'Invalid URL';
-      }
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -53,11 +39,6 @@ export function AddServiceModal({ onClose, onServiceAdded }) {
       id: Date.now().toString(),
       type: 'rest',
       name: restForm.name.trim(),
-      url: restForm.url.trim(),
-      method: restForm.method,
-      expectedStatus: parseInt(restForm.expectedStatus, 10),
-      interval: parseInt(restForm.interval, 10),
-      timeout: parseInt(restForm.timeout, 10),
     };
 
     dispatch({ type: 'ADD_SERVICE', payload: service });
@@ -111,7 +92,7 @@ export function AddServiceModal({ onClose, onServiceAdded }) {
         {step === 'rest' && (
           <>
             <h2>Add REST API Service</h2>
-            <p className="modal-description">Configure the health check endpoint</p>
+            <p className="modal-description">Name your service. You can configure a health check endpoint later.</p>
 
             <div className="form-group">
               <label htmlFor="name">Service Name</label>
@@ -123,64 +104,6 @@ export function AddServiceModal({ onClose, onServiceAdded }) {
                 placeholder="My API Service"
               />
               {errors.name && <span className="error">{errors.name}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="url">Health Check URL</label>
-              <input
-                id="url"
-                type="text"
-                value={restForm.url}
-                onChange={e => setRestForm({ ...restForm, url: e.target.value })}
-                placeholder="https://api.example.com/health"
-              />
-              {errors.url && <span className="error">{errors.url}</span>}
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="method">Method</label>
-                <select
-                  id="method"
-                  value={restForm.method}
-                  onChange={e => setRestForm({ ...restForm, method: e.target.value })}
-                >
-                  <option value="GET">GET</option>
-                  <option value="HEAD">HEAD</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="expectedStatus">Expected Status</label>
-                <input
-                  id="expectedStatus"
-                  type="number"
-                  value={restForm.expectedStatus}
-                  onChange={e => setRestForm({ ...restForm, expectedStatus: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="interval">Check Interval (ms)</label>
-                <input
-                  id="interval"
-                  type="number"
-                  value={restForm.interval}
-                  onChange={e => setRestForm({ ...restForm, interval: e.target.value })}
-                  min="5000"
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="timeout">Timeout (ms)</label>
-                <input
-                  id="timeout"
-                  type="number"
-                  value={restForm.timeout}
-                  onChange={e => setRestForm({ ...restForm, timeout: e.target.value })}
-                  min="1000"
-                />
-              </div>
             </div>
 
             <div className="modal-actions">
