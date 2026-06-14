@@ -24,6 +24,7 @@ import com.dashboard.command.synthetic.ports.outbound.SyntheticTransactionReposi
 import com.dashboard.command.synthetic.usecases.InjectEventUseCase;
 import com.dashboard.command.synthetic.usecases.RestInjectAndProbeUseCase;
 import com.dashboard.command.synthetic.usecases.RunSyntheticTransactionUseCase;
+import com.dashboard.command.synthetic.usecases.TemplateResolver;
 import com.dashboard.command.synthetic.usecases.TraceEventUseCase;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +53,7 @@ public class RestControllerSyntheticInboundAdapter {
     private final SyntheticRunRepositoryPort runRepository;
     private final RunSyntheticTransactionUseCase runUseCase;
     private final ObjectMapper objectMapper;
+    private final TemplateResolver templateResolver;
 
     @PostMapping("/inject")
     public Mono<ResponseEntity<?>> inject(@RequestBody InjectRequestDto request) {
@@ -152,7 +154,11 @@ public class RestControllerSyntheticInboundAdapter {
         String method = request.getMethod() == null || request.getMethod().isBlank()
                 ? "GET" : request.getMethod();
 
-        return httpProbePort.execute(request.getUrl(), method, request.getBody(), request.getHeaders())
+        String resolvedUrl = templateResolver.render(request.getUrl());
+        String resolvedBody = templateResolver.render(request.getBody());
+        Map<String, String> resolvedHeaders = renderHeaderMap(request.getHeaders());
+
+        return httpProbePort.execute(resolvedUrl, method, resolvedBody, resolvedHeaders)
                 .<ResponseEntity<?>>map(response -> ResponseEntity.ok(ProbeResponseDto.builder()
                         .statusCode(response.getStatusCode())
                         .body(response.getBody())
@@ -163,6 +169,22 @@ public class RestControllerSyntheticInboundAdapter {
                         .error(e.getMessage())
                         .elapsedTime(System.currentTimeMillis() - start)
                         .build())));
+    }
+
+    @PostMapping("/template/preview")
+    public Mono<ResponseEntity<?>> previewTemplate(@RequestBody Map<String, String> payload) {
+        String input = payload != null ? payload.get("text") : null;
+        if (input == null) {
+            return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Missing 'text' field")));
+        }
+        return Mono.just(ResponseEntity.ok(Map.of("rendered", templateResolver.render(input))));
+    }
+
+    private Map<String, String> renderHeaderMap(Map<String, String> headers) {
+        if (headers == null || headers.isEmpty()) return headers;
+        Map<String, String> out = new HashMap<>(headers.size());
+        headers.forEach((k, v) -> out.put(k, templateResolver.render(v)));
+        return out;
     }
 
     @PostMapping("/rest/inject-and-check")

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IdPathPicker } from './IdPathPicker';
+import { FxPalette } from './FxPalette';
+import { previewTemplate } from '../../utils/synthetic';
 import './SyntheticForm.css';
 
 export const DEFAULT_KAFKA_CONFIG = {
@@ -70,6 +72,35 @@ function CloseIcon() {
   );
 }
 
+function FxIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M2.5 13c1.5 0 2-1 2.5-3.5l1-5C6.5 2 7.5 1.5 9 2M3 8h5M10 6l3 7M13 6l-3 7"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
 function WandIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -109,13 +140,39 @@ function FieldLabel({ htmlFor, label, onExpand }) {
   );
 }
 
-function JsonFieldHeader({ htmlFor, label, validity, onBeautify, onExpand }) {
+function JsonFieldHeader({
+  htmlFor, label, validity, onBeautify, onExpand,
+  fxRef, onFxToggle, onPreview,
+}) {
   return (
     <div className="label-row">
       <label htmlFor={htmlFor}>{label}</label>
       <span className="label-row-actions">
         {validity === 'invalid' && <span className="json-chip json-chip-invalid">Invalid JSON</span>}
         {validity === 'valid' && <span className="json-chip json-chip-valid">JSON</span>}
+        {onFxToggle && (
+          <button
+            ref={fxRef}
+            type="button"
+            className="fx-btn"
+            onClick={onFxToggle}
+            title="Insert dynamic value"
+          >
+            <FxIcon />
+            <span>fx</span>
+          </button>
+        )}
+        {onPreview && (
+          <button
+            type="button"
+            className="preview-btn"
+            onClick={onPreview}
+            title="Preview rendered template"
+          >
+            <EyeIcon />
+            <span>Preview</span>
+          </button>
+        )}
         <button
           type="button"
           className="beautify-btn"
@@ -127,6 +184,61 @@ function JsonFieldHeader({ htmlFor, label, validity, onBeautify, onExpand }) {
         </button>
         {onExpand && <ExpandButton onClick={onExpand} label={label} />}
       </span>
+    </div>
+  );
+}
+
+function PreviewModal({ open, label, value, onClose }) {
+  const [rendered, setRendered] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setRendered('');
+    previewTemplate(value || '')
+      .then((r) => { if (!cancelled) setRendered(r.rendered ?? ''); })
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="preview-header">
+          <div className="preview-title-group">
+            <span className="preview-eyebrow">Preview</span>
+            <h3 className="preview-title">{label}</h3>
+          </div>
+          <button type="button" className="preview-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="preview-body">
+          {loading ? (
+            <p className="preview-placeholder">Rendering…</p>
+          ) : error ? (
+            <p className="preview-error">{error}</p>
+          ) : (
+            <pre className="preview-output">{rendered}</pre>
+          )}
+        </div>
+        <div className="preview-footer">
+          <span className="preview-hint">One sample render. Values change each run.</span>
+          <button type="button" className="preview-done" onClick={onClose}>Done</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -208,6 +320,13 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expandedField, setExpandedField] = useState(null);
   const [idPickerOpen, setIdPickerOpen] = useState(false);
+  const [fxTarget, setFxTarget] = useState(null);
+  const [previewTarget, setPreviewTarget] = useState(null);
+
+  const restBodyRef = useRef(null);
+  const restBodyFxRef = useRef(null);
+  const kafkaPayloadRef = useRef(null);
+  const kafkaPayloadFxRef = useRef(null);
 
   const bodyValidity = jsonValidity(rest.body);
   const payloadValidity = jsonValidity(kafka.payload);
@@ -225,6 +344,31 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
     try {
       setter(field, JSON.stringify(JSON.parse(source), null, 2));
     } catch { /* no-op */ }
+  };
+
+  const insertAtCursor = (textareaRef, current, token, applyChange) => {
+    const el = textareaRef.current;
+    if (!el) {
+      applyChange((current || '') + token);
+      return;
+    }
+    const start = el.selectionStart ?? current.length;
+    const end = el.selectionEnd ?? current.length;
+    const next = (current || '').slice(0, start) + token + (current || '').slice(end);
+    applyChange(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const handleInsertToken = (token) => {
+    if (fxTarget === 'restBody') {
+      insertAtCursor(restBodyRef, rest.body, token, (v) => handleRestChange('body', v));
+    } else if (fxTarget === 'kafkaPayload') {
+      insertAtCursor(kafkaPayloadRef, kafka.payload, token, (v) => handleKafkaChange('payload', v));
+    }
   };
 
   const expandRest = (key, label, opts = {}) => () =>
@@ -337,7 +481,7 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
               </div>
             </div>
 
-            <div className="form-group">
+            <div className="form-group form-group-fx-anchor">
               <JsonFieldHeader
                 htmlFor="payload"
                 label="Payload (JSON)"
@@ -349,9 +493,19 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                   isJson: true,
                   placeholder: '{"orderId": "12345", "amount": 99.99}',
                 })}
+                fxRef={kafkaPayloadFxRef}
+                onFxToggle={() => setFxTarget(fxTarget === 'kafkaPayload' ? null : 'kafkaPayload')}
+                onPreview={() => setPreviewTarget({ label: 'Payload (JSON)', value: kafka.payload })}
+              />
+              <FxPalette
+                open={fxTarget === 'kafkaPayload'}
+                anchorRef={kafkaPayloadFxRef}
+                onInsert={handleInsertToken}
+                onClose={() => setFxTarget(null)}
               />
               <textarea
                 id="payload"
+                ref={kafkaPayloadRef}
                 className={payloadValidity === 'invalid' ? 'json-invalid' : ''}
                 value={kafka.payload}
                 onChange={(e) => handleKafkaChange('payload', e.target.value)}
@@ -403,7 +557,7 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                   </div>
                 </div>
 
-                <div className="form-group form-group-last">
+                <div className="form-group form-group-last form-group-fx-anchor">
                   <JsonFieldHeader
                     htmlFor="restBody"
                     label="Request Body (JSON)"
@@ -415,9 +569,19 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
                       isJson: true,
                       placeholder: '{"orderId": "12345", "amount": 99.99}',
                     })}
+                    fxRef={restBodyFxRef}
+                    onFxToggle={() => setFxTarget(fxTarget === 'restBody' ? null : 'restBody')}
+                    onPreview={() => setPreviewTarget({ label: 'Request Body (JSON)', value: rest.body })}
+                  />
+                  <FxPalette
+                    open={fxTarget === 'restBody'}
+                    anchorRef={restBodyFxRef}
+                    onInsert={handleInsertToken}
+                    onClose={() => setFxTarget(null)}
                   />
                   <textarea
                     id="restBody"
+                    ref={restBodyRef}
                     className={bodyValidity === 'invalid' ? 'json-invalid' : ''}
                     value={rest.body}
                     onChange={(e) => handleRestChange('body', e.target.value)}
@@ -604,6 +768,13 @@ export function SyntheticForm({ mode, onModeChange, kafka, onKafkaChange, rest, 
         value={rest.idJsonPath}
         onChange={(path) => handleRestChange('idJsonPath', path)}
         onClose={() => setIdPickerOpen(false)}
+      />
+
+      <PreviewModal
+        open={previewTarget != null}
+        label={previewTarget?.label}
+        value={previewTarget?.value}
+        onClose={() => setPreviewTarget(null)}
       />
     </>
   );

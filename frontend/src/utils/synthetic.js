@@ -149,6 +149,19 @@ export async function getRun(id) {
   return response.json();
 }
 
+export async function previewTemplate(text) {
+  const response = await fetch(`${BACKEND_URL}/api/synthetic/template/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) {
+    const err = await safeJson(response);
+    throw new Error(err.error || err.message || 'Failed to render preview');
+  }
+  return response.json();
+}
+
 async function safeJson(response) {
   try { return await response.json(); } catch { return {}; }
 }

@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -26,29 +28,35 @@ public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCa
     private static final long MIN_POLL_INTERVAL = 250;
 
     private final HttpProbePort httpProbePort;
+    private final TemplateResolver templateResolver;
 
     @Override
     public Mono<RestCheckResult> execute(RestInjectCommand command) {
         long startTime = System.currentTimeMillis();
 
-        return httpProbePort.execute(command.getStartUrl(), command.getMethod(),
-                        command.getBody(), command.getHeaders())
+        String resolvedStartUrl = templateResolver.render(command.getStartUrl());
+        String resolvedBody = templateResolver.render(command.getBody());
+        Map<String, String> resolvedHeaders = renderHeaders(command.getHeaders());
+
+        return httpProbePort.execute(resolvedStartUrl, command.getMethod(),
+                        resolvedBody, resolvedHeaders)
                 .onErrorResume(e -> Mono.just(HttpProbeResponse.builder()
                         .statusCode(-1)
                         .body("Request failed: " + e.getMessage())
                         .build()))
-                .flatMap(startResponse -> handleStartResponse(command, startResponse, startTime));
+                .flatMap(startResponse -> handleStartResponse(command, startResponse, resolvedHeaders, startTime));
     }
 
     private Mono<RestCheckResult> handleStartResponse(RestInjectCommand command,
-                                                      HttpProbeResponse startResponse, long startTime) {
+                                                      HttpProbeResponse startResponse,
+                                                      Map<String, String> resolvedHeaders, long startTime) {
         if (startResponse.getStatusCode() < 200 || startResponse.getStatusCode() >= 300) {
             return Mono.just(errorResult(command, startResponse, null,
                     "Start endpoint returned status " + startResponse.getStatusCode(), startTime));
         }
 
         String extractedId = null;
-        String probeUrl = command.getProbeUrl();
+        String probeUrl = templateResolver.render(command.getProbeUrl());
 
         if (probeUrl.contains(ID_PLACEHOLDER)) {
             try {
@@ -66,16 +74,17 @@ public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCa
         AtomicInteger attempts = new AtomicInteger();
         AtomicReference<HttpProbeResponse> lastResponse = new AtomicReference<>();
 
-        return pollProbe(command, probeUrl, extractedId, startResponse,
+        return pollProbe(command, probeUrl, extractedId, startResponse, resolvedHeaders,
                 pollInterval, startTime, attempts, lastResponse);
     }
 
     private Mono<RestCheckResult> pollProbe(RestInjectCommand command, String probeUrl,
                                               String extractedId, HttpProbeResponse startResponse,
+                                              Map<String, String> resolvedHeaders,
                                               long pollInterval, long startTime,
                                               AtomicInteger attempts,
                                               AtomicReference<HttpProbeResponse> lastResponse) {
-        return httpProbePort.execute(probeUrl, "GET", null, command.getHeaders())
+        return httpProbePort.execute(probeUrl, "GET", null, resolvedHeaders)
                 .onErrorResume(e -> Mono.just(HttpProbeResponse.builder()
                         .statusCode(-1)
                         .body("Request failed: " + e.getMessage())
@@ -98,8 +107,15 @@ public class DefaultRestInjectAndProbeUseCase implements RestInjectAndProbeUseCa
 
                     return Mono.delay(Duration.ofMillis(pollInterval))
                             .flatMap(tick -> pollProbe(command, probeUrl, extractedId, startResponse,
-                                    pollInterval, startTime, attempts, lastResponse));
+                                    resolvedHeaders, pollInterval, startTime, attempts, lastResponse));
                 });
+    }
+
+    private Map<String, String> renderHeaders(Map<String, String> headers) {
+        if (headers == null || headers.isEmpty()) return headers;
+        Map<String, String> out = new HashMap<>(headers.size());
+        headers.forEach((k, v) -> out.put(k, templateResolver.render(v)));
+        return out;
     }
 
     private String tryExtractStatus(HttpProbeResponse response, String statusJsonPath) {
