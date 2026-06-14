@@ -6,68 +6,9 @@ import {
   jsonValidity,
 } from './SyntheticForm';
 import { SwaggerSpecPanel } from './SwaggerSpecPanel';
+import { buildStartPatch, buildProbePatch, rebindIdPath } from './swaggerInference';
 import { createTransaction, updateTransaction } from '../../utils/synthetic';
 import './TransactionEditor.css';
-
-function pickServerBase(spec) {
-  const url = spec?.servers?.[0];
-  if (!url) return '';
-  return url.replace(/\/+$/, '');
-}
-
-function buildPathUrl(base, path) {
-  if (!path) return base;
-  return base + (path.startsWith('/') ? path : `/${path}`);
-}
-
-function applyStartOperation(restPrev, op, spec) {
-  const base = pickServerBase(spec);
-  const startUrl = buildPathUrl(base, op.path);
-  const body = op.requestExample
-    ? JSON.stringify(op.requestExample, null, 2)
-    : restPrev.body || '{}';
-  return {
-    ...restPrev,
-    method: op.method,
-    startUrl,
-    body,
-    requestFields: op.requestFields || [],
-    dynamicFields: [],
-  };
-}
-
-function applyProbeOperation(restPrev, op, spec) {
-  const base = pickServerBase(spec);
-  let path = op.path;
-  const firstParam = op.pathParams?.[0];
-  if (firstParam) {
-    path = path.replace(`{${firstParam}}`, '{{id}}');
-  }
-  const probeUrl = buildPathUrl(base, path);
-
-  // Try to suggest a status path and terminal value from a 200 response.
-  let statusJsonPath = restPrev.statusJsonPath;
-  let expectedStatusValue = restPrev.expectedStatusValue;
-  const okResponse = op.responses?.['200'] || op.responses?.['default'];
-  if (okResponse?.fields) {
-    const statusField = okResponse.fields.find((f) => /^status$|\.status$/i.test(f.path));
-    if (statusField) {
-      statusJsonPath = `$.${statusField.path}`;
-      if (statusField.enumValues && statusField.enumValues.length && !expectedStatusValue) {
-        expectedStatusValue = statusField.enumValues[statusField.enumValues.length - 1];
-      }
-    }
-  }
-
-  // Suggest an idJsonPath when the path param name matches a top-level field
-  // in the START response. We don't have the start op here — leave as-is and let the user pick.
-  return {
-    ...restPrev,
-    probeUrl,
-    statusJsonPath,
-    expectedStatusValue,
-  };
-}
 
 function CloseIcon() {
   return (
@@ -208,7 +149,9 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
   const [error, setError] = useState(null);
   const [startOpKey, setStartOpKey] = useState(null);
   const [probeOpKey, setProbeOpKey] = useState(null);
-  const [startOpResponses, setStartOpResponses] = useState(null);
+  const [startOp, setStartOp] = useState(null);
+  const [probeOp, setProbeOp] = useState(null);
+  const [inference, setInference] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -216,9 +159,17 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
       setError(null);
       setStartOpKey(null);
       setProbeOpKey(null);
-      setStartOpResponses(null);
+      setStartOp(null);
+      setProbeOp(null);
+      setInference(null);
     }
   }, [open, editing]);
+
+  useEffect(() => {
+    if (!inference) return;
+    const timer = setTimeout(() => setInference(null), 6000);
+    return () => clearTimeout(timer);
+  }, [inference]);
 
   useEffect(() => {
     if (!open) return;
@@ -326,21 +277,57 @@ export function TransactionEditor({ open, editing, onClose, onSaved }) {
               probeOpKey={probeOpKey}
               onPickStart={(op, spec) => {
                 setStartOpKey(`${op.method} ${op.path}`);
-                setStartOpResponses(op.responses || null);
-                update({ rest: applyStartOperation(state.rest, op, spec) });
+                setStartOp(op);
+                let { rest: nextRest, inference: info } = buildStartPatch(state.rest, op, spec);
+                // If a probe was already chosen, re-derive idJsonPath from the new start response.
+                if (probeOp) {
+                  nextRest = rebindIdPath(nextRest, probeOp, op);
+                }
+                update({ rest: nextRest });
+                setInference(info);
               }}
               onPickProbe={(op, spec) => {
                 setProbeOpKey(`${op.method} ${op.path}`);
-                let nextRest = applyProbeOperation(state.rest, op, spec);
-                if (startOpResponses && op.pathParams?.[0]) {
-                  const okResp = startOpResponses['200'] || startOpResponses['201'] || startOpResponses['default'];
-                  const param = op.pathParams[0];
-                  const match = okResp?.fields?.find((f) => f.path === param || f.path.endsWith(`.${param}`));
-                  if (match) nextRest = { ...nextRest, idJsonPath: `$.${match.path}` };
-                }
+                setProbeOp(op);
+                const { rest: nextRest, inference: info } = buildProbePatch(state.rest, op, spec, startOp);
                 update({ rest: nextRest });
+                setInference(info);
               }}
             />
+          )}
+
+          {inference && (
+            <div className="tx-inference" role="status" aria-live="polite">
+              <span className="tx-inference-eyebrow">Auto-filled from spec</span>
+              <span className="tx-inference-body">
+                {inference.kind === 'start' && (
+                  <>
+                    <code>{inference.operationId}</code> as Start —
+                    {' '}method, URL, body, and Request Shape populated.
+                  </>
+                )}
+                {inference.kind === 'probe' && (
+                  <>
+                    <code>{inference.operationId}</code> as Probe —
+                    {inference.fields.probeUrl && ' probe URL'}
+                    {inference.fields.statusJsonPath && ', status path'}
+                    {inference.fields.expectedStatusValue && ', terminal value'}
+                    {inference.fields.idJsonPath && ', ID extraction'}
+                    {inference.chainParam && (
+                      <> · chained on <code>{`{${inference.chainParam}}`}</code></>
+                    )}
+                  </>
+                )}
+              </span>
+              <button
+                type="button"
+                className="tx-inference-dismiss"
+                onClick={() => setInference(null)}
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
           )}
           <SyntheticForm
             mode={state.mode}
